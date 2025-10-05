@@ -1,3 +1,4 @@
+   import { db } from "./firebase-config"; 
    // Esperar o Firebase carregar
 window.addEventListener('load', function () {
     // Verificar se o Firebase foi carregado
