@@ -1,4 +1,5 @@
 // Importações do Firebase
+// Importações do Firebase
 import { db } from './firebase-config.js';
 import { collection, getDocs, query, where, orderBy, limit, doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 
@@ -1653,3 +1654,4 @@ document.addEventListener('DOMContentLoaded', async () => {
         hideLoading();
     }
 });
+
