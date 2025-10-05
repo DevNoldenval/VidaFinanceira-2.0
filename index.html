@@ -1,454 +1,223 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FinanFácil - Controle Financeiro Pessoal</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="css/style.css">
+    <title>Teste Firebase - FinanFácil</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            font-family: monospace;
+            font-size: 14px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        .button:hover {
+            background-color: #0056b3;
+        }
+        .button.success {
+            background-color: #28a745;
+        }
+        .button.success:hover {
+            background-color: #1e7e34;
+        }
+    </style>
 </head>
-
 <body>
-    <header>
-        <div class="container header-container">
-            <div class="logo">
-                <i class="fas fa-wallet"></i>
-                <span>FinanFácil</span>
-            </div>
-            <div class="user-info">
-                <select class="user-selector" id="userSelector">
-                    <option value="user1">Noldenval</option>
-                    <option value="user2">Eliane</option>
-                </select>
-                <div class="user-avatar" id="userAvatar">V</div>
-            </div>
-        </div>
-    </header>
-    <main class="container">
-        <section class="dashboard">
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">Receitas</h3>
-                    <div class="card-icon income-icon">
-                        <i class="fas fa-arrow-up"></i>
-                    </div>
-                </div>
-                <div class="card-value" id="incomeValue">R$ 0,00</div>
-                <div class="card-description">Total de receitas do mês</div>
-            </div>
-
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">Despesas</h3>
-                    <div class="card-icon expense-icon">
-                        <i class="fas fa-arrow-down"></i>
-                    </div>
-                </div>
-                <div class="card-value" id="expenseValue">R$ 0,00</div>
-                <div class="card-description">Total de despesas do mês</div>
-            </div>
-
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">Saldo</h3>
-                    <div class="card-icon balance-icon">
-                        <i class="fas fa-balance-scale"></i>
-                    </div>
-                </div>
-                <div class="card-value" id="balanceValue">R$ 0,00</div>
-                <div class="card-description">Saldo atual do mês</div>
-            </div>
-        </section>
-
-        <section class="transactions-section">
-            <div class="section-header">
-                <h2 class="section-title">Transações Recentes</h2>
-                <button class="btn" id="addTransactionBtn">
-                    <i class="fas fa-plus"></i>
-                    <span>Nova Transação</span>
-                </button>
-            </div>
-
-            <div class="tabs">
-                <div class="tab active" data-tab="all">Todas</div>
-                <div class="tab" data-tab="income">Receitas</div>
-                <div class="tab" data-tab="expense">Despesas</div>
-            </div>
-
-            <div class="tab-content active" id="all-tab">
-                <div class="loading" id="allLoading">
-                    <div class="spinner"></div>
-                </div>
-                <table class="transactions-table" id="allTable" style="display: none;">
-                    <thead>
-                        <tr>
-                            <th>Descrição</th>
-                            <th>Categoria</th>
-                            <th>Data</th>
-                            <th>Valor</th>
-                            <th>Usuário</th>
-                            <th>Cartão</th>
-                            <th>Parcelas</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody id="transactionsTableBody">
-                        <tr>
-                            <td colspan="8" style="text-align: center; padding: 2rem;">Nenhuma transação encontrada</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="tab-content" id="income-tab">
-                <div class="loading" id="incomeLoading">
-                    <div class="spinner"></div>
-                </div>
-                <table class="transactions-table" id="incomeTable" style="display: none;">
-                    <thead>
-                        <tr>
-                            <th>Descrição</th>
-                            <th>Categoria</th>
-                            <th>Data</th>
-                            <th>Valor</th>
-                            <th>Usuário</th>
-                            <th>Cartão</th>
-                            <th>Parcelas</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody id="incomeTableBody">
-                        <tr>
-                            <td colspan="8" style="text-align: center; padding: 2rem;">Nenhuma receita encontrada</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="tab-content" id="expense-tab">
-                <div class="loading" id="expenseLoading">
-                    <div class="spinner"></div>
-                </div>
-                <table class="transactions-table" id="expenseTable" style="display: none;">
-                    <thead>
-                        <tr>
-                            <th>Descrição</th>
-                            <th>Categoria</th>
-                            <th>Data</th>
-                            <th>Valor</th>
-                            <th>Usuário</th>
-                            <th>Cartão</th>
-                            <th>Parcelas</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody id="expenseTableBody">
-                        <tr>
-                            <td colspan="8" style="text-align: center; padding: 2rem;">Nenhuma despesa encontrada</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </section>
-
-        <section class="cards-section">
-            <div class="section-header">
-                <h2 class="section-title">Cartões de Crédito</h2>
-                <button class="btn btn-secondary" id="addCardBtn">
-                    <i class="fas fa-plus"></i>
-                    <span>Adicionar Cartão</span>
-                </button>
-            </div>
-
-            <div class="loading" id="cardsLoading">
-                <div class="spinner"></div>
-            </div>
-            <div class="cards-grid" id="cardsGrid" style="display: none;">
-                <!-- Cartões serão carregados aqui -->
-            </div>
-        </section>
-
-         <section class="invoice-section">
-            <div class="section-header">
-                <h2 class="section-title">Relatório de Fatura</h2>
-                <button class="btn btn-secondary" id="generateInvoiceBtn">
-                    <i class="fas fa-file-invoice"></i>
-                    <span>Gerar Relatório</span>
-                </button>
-            </div>
-        </section>
-
-        <section class="users-section">
-            <div class="section-header">
-                <h2 class="section-title">Usuários</h2>
-                <button class="btn btn-secondary" id="addUserBtn">
-                    <i class="fas fa-plus"></i>
-                    <span>Adicionar Usuário</span>
-                </button>
-            </div>
-
-            <div class="loading" id="usersLoading">
-                <div class="spinner"></div>
-            </div>
-            <div class="users-grid" id="usersGrid" style="display: none;">
-                <!-- Usuários serão carregados aqui -->
-            </div>
-        </section>
-
-       
+    <div class="container">
+        <h1>Teste de Conexão Firebase</h1>
+        <p>Esta página irá testar a conexão com o Firebase e diagnosticar problemas.</p>
         
-    </main>
-
-    <!-- Modal de Transação -->
-    <div class="modal" id="transactionModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 class="modal-title">Nova Transação</h3>
-                <button class="close-btn" id="closeTransactionModal">&times;</button>
-            </div>
-
-            <form id="transactionForm">
-                <div class="form-group">
-                    <label class="form-label" for="transactionType">Tipo</label>
-                    <select class="form-control" id="transactionType">
-                        <option value="income">Receita</option>
-                        <option value="expense">Despesa</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="transactionDescription">Descrição</label>
-                    <input type="text" class="form-control" id="transactionDescription"
-                        placeholder="Ex: Salário, Supermercado" required>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="transactionCategory">Categoria</label>
-                    <select class="form-control" id="transactionCategory">
-                        <option value="food">Alimentação</option>
-                        <option value="transport">Transporte</option>
-                        <option value="shopping">Compras</option>
-                        <option value="bills">Contas</option>
-                        <option value="entertainment">Entretenimento</option>
-                        <option value="health">Saúde</option>
-                        <option value="education">Educação</option>
-                        <option value="salary">Salário</option>
-                        <option value="investments">Investimentos</option>
-                        <option value="other">Outros</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="transactionPaymentMethod">Método de Pagamento</label>
-                    <select class="form-control" id="transactionPaymentMethod">
-                        <option value="credit-card">Cartão de Crédito</option>
-                        <option value="debit-card">Cartão de Débito</option>
-                        <option value="pix">PIX</option>
-                        <option value="money">Dinheiro</option>
-                        <option value="bank-transfer">Transferência Bancária</option>
-                        <option value="boleto">Boleto</option>
-                    </select>
-                </div>
-
-                <!-- Campo para selecionar o cartão (aparece quando método de pagamento é cartão de crédito) -->
-                <div class="form-group" id="cardSelectionGroup" style="display: none;">
-                    <label class="form-label" for="transactionCard">Cartão</label>
-                    <select class="form-control" id="transactionCard">
-                        <option value="">Selecione um cartão</option>
-                    </select>
-                </div>
-
-                <!-- Campo para selecionar o usuário que utilizou o cartão -->
-                <div class="form-group" id="cardUserGroup" style="display: none;">
-                    <label class="form-label" for="transactionCardUser">Quem utilizou o cartão</label>
-                    <select class="form-control" id="transactionCardUser">
-                        <option value="">Selecione um usuário</option>
-                    </select>
-                </div>
-
-                <!-- Campo para informar se a compra é a prazo ou à vista (aparece quando método de pagamento é cartão de crédito) -->
-                <div class="form-group" id="installmentTypeGroup" style="display: none;">
-                    <label class="form-label">Tipo de pagamento</label>
-                    <div>
-                        <label class="radio-label">
-                            <input type="radio" name="installmentType" value="cash" checked> À vista
-                        </label>
-                        <label class="radio-label">
-                            <input type="radio" name="installmentType" value="installment"> A prazo
-                        </label>
-                    </div>
-                </div>
-
-                <!-- Campo para informar a quantidade de parcelas (aparece quando tipo de pagamento é a prazo) -->
-                <div class="form-group" id="installmentsGroup" style="display: none;">
-                    <label class="form-label" for="transactionInstallments">Quantidade de parcelas</label>
-                    <input type="number" class="form-control" id="transactionInstallments" min="2" max="36" value="2">
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="transactionValue">Valor (R$)</label>
-                    <input type="number" class="form-control" id="transactionValue" placeholder="0,00" step="0.01"
-                        min="0.01" required>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="transactionDate">Data</label>
-                    <input type="date" class="form-control" id="transactionDate" required>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="transactionUser">Usuário</label>
-                    <select class="form-control" id="transactionUser">
-                        <option value="user1">Você</option>
-                        <option value="user2">Sua Esposa</option>
-                    </select>
-                </div>
-
-                <div class="form-actions">
-                    <button type="button" class="btn btn-cancel" id="cancelTransaction">Cancelar</button>
-                    <button type="submit" class="btn btn-success">Salvar</button>
-                </div>
-            </form>
+        <div id="status" class="status info">
+            Iniciando testes...
         </div>
-    </div>
-
-    <!-- Modal de Cartão -->
-    <div class="modal" id="cardModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 class="modal-title">Adicionar Cartão</h3>
-                <button class="close-btn" id="closeCardModal">&times;</button>
-            </div>
-
-            <form id="cardForm">
-                <div class="form-group">
-                    <label class="form-label" for="cardName">Nome do Cartão</label>
-                    <input type="text" class="form-control" id="cardName" placeholder="Ex: Nubank, Itaú" required>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="cardLimit">Limite Total (R$)</label>
-                    <input type="number" class="form-control" id="cardLimit" placeholder="0,00" step="0.01" min="0.01"
-                        required>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="cardClosingDay">Dia de Fechamento</label>
-                    <input type="number" class="form-control" id="cardClosingDay" placeholder="Ex: 10" min="1" max="31"
-                        required>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="cardDueDate">Dia do Vencimento</label>
-                    <input type="number" class="form-control" id="cardDueDate" placeholder="Ex: 15" min="1" max="31"
-                        required>
-                </div>
-
-                <div class="form-actions">
-                    <button type="button" class="btn btn-cancel" id="cancelCard">Cancelar</button>
-                    <button type="submit" class="btn btn-success">Salvar</button>
-                </div>
-            </form>
+        
+        <button class="button" onclick="testConnection()">Testar Conexão</button>
+        <button class="button success" onclick="window.location.href='index.html'">Ir para o App</button>
+        
+        <div class="log" id="log">
+            Aguardando início dos testes...
         </div>
-    </div>
-
-    <!-- Modal de Usuário -->
-    <div class="modal" id="userModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 class="modal-title">Adicionar Usuário</h3>
-                <button class="close-btn" id="closeUserModal">&times;</button>
-            </div>
-
-            <form id="userForm">
-                <div class="form-group">
-                    <label class="form-label" for="userName">Nome</label>
-                    <input type="text" class="form-control" id="userName" placeholder="Ex: João, Maria" required>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="userEmail">E-mail</label>
-                    <input type="email" class="form-control" id="userEmail" placeholder="Ex: joao@example.com">
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="usuario">Apelido</label>
-                    <input type="text" class="form-control" id="usuario" placeholder="Ex: Chico" maxlength="12">
-                </div>
-
-                <div class="form-actions">
-                    <button type="button" class="btn btn-cancel" id="cancelUser">Cancelar</button>
-                    <button type="submit" class="btn btn-success">Salvar</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal de Relatório de Fatura -->
-    <div class="modal" id="invoiceReportModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 class="modal-title">Relatório de Fatura</h3>
-                <button class="close-btn" id="closeInvoiceReportModal">&times;</button>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="reportCard">Cartão</label>
-                <select class="form-control" id="reportCard">
-                    <option value="">Selecione um cartão</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="reportMonth">Mês</label>
-                <select class="form-control" id="reportMonth">
-                    <option value="0">Janeiro</option>
-                    <option value="1">Fevereiro</option>
-                    <option value="2">Março</option>
-                    <option value="3">Abril</option>
-                    <option value="4">Maio</option>
-                    <option value="5">Junho</option>
-                    <option value="6">Julho</option>
-                    <option value="7">Agosto</option>
-                    <option value="8">Setembro</option>
-                    <option value="9">Outubro</option>
-                    <option value="10">Novembro</option>
-                    <option value="11">Dezembro</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="reportYear">Ano</label>
-                <select class="form-control" id="reportYear">
-                    <!-- Anos serão preenchidos dinamicamente -->
-                </select>
-            </div>
-
-            <div class="form-actions">
-                <button type="button" class="btn btn-cancel" id="cancelInvoiceReport">Cancelar</button>
-                <button type="button" class="btn btn-success" id="generateInvoiceReport">Gerar Relatório</button>
-            </div>
-
-            <div id="invoiceReportContent" style="margin-top: 20px; display: none;">
-                <!-- Conteúdo do relatório será gerado aqui -->
-            </div>
-        </div>
-    </div>
-
-    <div class="notification" id="notification">
-        <i class="fas fa-check-circle"></i>
-        <span id="notificationMessage">Operação realizada com sucesso!</span>
     </div>
 
     <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     
-    <!-- Nosso script --> 
-    <script src="js/firebase-config.js"></script>
-    <script src="js/script.js"></script>
- 
+    <script>
+        let log = [];
+        
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}`;
+            log.push(logEntry);
+            
+            const logElement = document.getElementById('log');
+            logElement.innerHTML = log.join('<br>');
+            logElement.scrollTop = logElement.scrollHeight;
+            
+            console.log(logEntry);
+        }
+        
+        function updateStatus(message, type = 'info') {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = message;
+            statusElement.className = `status ${type}`;
+        }
+        
+        function testConnection() {
+            log = [];
+            addLog('Iniciando teste de conexão Firebase...');
+            updateStatus('Testando conexão...', 'info');
+            
+            // Teste 1: Verificar se o Firebase foi carregado
+            addLog('Teste 1: Verificando se o Firebase SDK foi carregado...');
+            if (typeof firebase === 'undefined') {
+                addLog('❌ ERRO: Firebase SDK não foi carregado', 'error');
+                updateStatus('ERRO: Firebase SDK não foi carregado. Verifique sua conexão com a internet.', 'error');
+                return;
+            } else {
+                addLog('✅ Firebase SDK carregado com sucesso!', 'success');
+            }
+            
+            // Teste 2: Verificar se o firestore foi carregado
+            addLog('Teste 2: Verificando se o Firestore foi carregado...');
+            if (typeof firebase.firestore === 'undefined') {
+                addLog('❌ ERRO: Firestore não foi carregado', 'error');
+                updateStatus('ERRO: Firestore não foi carregado.', 'error');
+                return;
+            } else {
+                addLog('✅ Firestore carregado com sucesso!', 'success');
+            }
+            
+            // Teste 3: Inicializar Firebase
+            addLog('Teste 3: Inicializando Firebase...');
+            try {
+                const firebaseConfig = {
+                    apiKey: "AIzaSyCYQm0K_4EdKHvvXOs81raKmstmAsRdT6g",
+                    authDomain: "controlemeubolso.firebaseapp.com",
+                    databaseURL: "https://controlemeubolso-default-rtdb.firebaseio.com",
+                    projectId: "controlemeubolso",
+                    storageBucket: "controlemeubolso.firebasestorage.app",
+                    messagingSenderId: "369393280169",
+                    appId: "1:369393280169:web:0b0d768f074e0ff4c775b8",
+                    measurementId: "G-0EYHJF137F"
+                };
+                
+                firebase.initializeApp(firebaseConfig);
+                addLog('✅ Firebase inicializado com sucesso!', 'success');
+            } catch (error) {
+                addLog(`❌ ERRO: Falha ao inicializar Firebase: ${error.message}`, 'error');
+                updateStatus(`ERRO: Falha ao inicializar Firebase: ${error.message}`, 'error');
+                return;
+            }
+            
+            // Teste 4: Obter instância do Firestore
+            addLog('Teste 4: Obtendo instância do Firestore...');
+            try {
+                const db = firebase.firestore();
+                addLog('✅ Instância do Firestore obtida com sucesso!', 'success');
+                addLog(`📋 Database object: ${db}`, 'info');
+            } catch (error) {
+                addLog(`❌ ERRO: Falha ao obter instância do Firestore: ${error.message}`, 'error');
+                updateStatus(`ERRO: Falha ao obter instância do Firestore: ${error.message}`, 'error');
+                return;
+            }
+            
+            // Teste 5: Testar conexão com o Firestore
+            addLog('Teste 5: Testando conexão com o Firestore...');
+            try {
+                const db = firebase.firestore();
+                
+                // Tentar uma consulta simples
+                db.collection('connections').add({
+                    test: true,
+                    timestamp: new Date().toISOString()
+                }).then(docRef => {
+                    addLog(`✅ Conexão com Firestore bem sucedida!`, 'success');
+                    addLog(`📝 Documento de teste criado com ID: ${docRef.id}`, 'success');
+                    updateStatus('✅ Todos os testes passaram! O Firebase está funcionando corretamente.', 'success');
+                    
+                    // Limpar o documento de teste
+                    db.collection('connections').doc(docRef.id).delete()
+                        .then(() => {
+                            addLog('🧹 Documento de teste removido', 'info');
+                        })
+                        .catch(error => {
+                            addLog(`⚠️ Aviso: Não foi possível remover o documento de teste: ${error.message}`, 'warning');
+                        });
+                    
+                }).catch(error => {
+                    addLog(`❌ ERRO: Falha na conexão com Firestore: ${error.message}`, 'error');
+                    updateStatus(`ERRO: Falha na conexão com Firestore: ${error.message}`, 'error');
+                });
+                
+            } catch (error) {
+                addLog(`❌ ERRO: Exceção ao testar conexão: ${error.message}`, 'error');
+                updateStatus(`ERRO: Exceção ao testar conexão: ${error.message}`, 'error');
+            }
+        }
+        
+        // Iniciar teste automaticamente quando a página carregar
+        window.addEventListener('load', function() {
+            setTimeout(testConnection, 1000);
+        });
+    </script>
 </body>
-
 </html>
