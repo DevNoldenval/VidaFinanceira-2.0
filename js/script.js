@@ -1,5 +1,5 @@
-   import { db } from "./firebase-config.js";
-   import { collection, getDocs, query, where, orderBy, limit, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
+import { db } from './firebase-config.js';
+import { collection, getDocs, query, where, orderBy, limit, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
    
    // Esperar o Firebase carregar
 window.addEventListener('load', function () {
@@ -1614,4 +1614,5 @@ window.addEventListener('load', function () {
         }
     };
 });
+
 
