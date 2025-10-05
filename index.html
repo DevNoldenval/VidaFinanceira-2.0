@@ -95,7 +95,7 @@
                     </thead>
                     <tbody id="transactionsTableBody">
                         <tr>
-                            <td colspan="7" style="text-align: center; padding: 2rem;">Nenhuma transação encontrada</td>
+                            <td colspan="8" style="text-align: center; padding: 2rem;">Nenhuma transação encontrada</td>
                         </tr>
                     </tbody>
                 </table>
@@ -120,7 +120,7 @@
                     </thead>
                     <tbody id="incomeTableBody">
                         <tr>
-                            <td colspan="7" style="text-align: center; padding: 2rem;">Nenhuma receita encontrada</td>
+                            <td colspan="8" style="text-align: center; padding: 2rem;">Nenhuma receita encontrada</td>
                         </tr>
                     </tbody>
                 </table>
@@ -145,7 +145,7 @@
                     </thead>
                     <tbody id="expenseTableBody">
                         <tr>
-                            <td colspan="7" style="text-align: center; padding: 2rem;">Nenhuma despesa encontrada</td>
+                            <td colspan="8" style="text-align: center; padding: 2rem;">Nenhuma despesa encontrada</td>
                         </tr>
                     </tbody>
                 </table>
@@ -441,12 +441,14 @@
         <span id="notificationMessage">Operação realizada com sucesso!</span>
     </div>
 
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    
     <!-- Nosso script --> 
-    <script type="module" src="js/firebase-config.js"></script>
-    <script type="module" src="js/script.js"></script>
+    <script src="js/firebase-config.js"></script>
+    <script src="js/script.js"></script>
  
 </body>
 
 </html>
-
-
