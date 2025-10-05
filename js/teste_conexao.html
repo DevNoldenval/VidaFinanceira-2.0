@@ -1,1 +1,223 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Firebase - FinanFácil</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            font-family: monospace;
+            font-size: 14px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        .button:hover {
+            background-color: #0056b3;
+        }
+        .button.success {
+            background-color: #28a745;
+        }
+        .button.success:hover {
+            background-color: #1e7e34;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Teste de Conexão Firebase</h1>
+        <p>Esta página irá testar a conexão com o Firebase e diagnosticar problemas.</p>
+        
+        <div id="status" class="status info">
+            Iniciando testes...
+        </div>
+        
+        <button class="button" onclick="testConnection()">Testar Conexão</button>
+        <button class="button success" onclick="window.location.href='index.html'">Ir para o App</button>
+        
+        <div class="log" id="log">
+            Aguardando início dos testes...
+        </div>
+    </div>
 
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    
+    <script>
+        let log = [];
+        
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}`;
+            log.push(logEntry);
+            
+            const logElement = document.getElementById('log');
+            logElement.innerHTML = log.join('<br>');
+            logElement.scrollTop = logElement.scrollHeight;
+            
+            console.log(logEntry);
+        }
+        
+        function updateStatus(message, type = 'info') {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = message;
+            statusElement.className = `status ${type}`;
+        }
+        
+        function testConnection() {
+            log = [];
+            addLog('Iniciando teste de conexão Firebase...');
+            updateStatus('Testando conexão...', 'info');
+            
+            // Teste 1: Verificar se o Firebase foi carregado
+            addLog('Teste 1: Verificando se o Firebase SDK foi carregado...');
+            if (typeof firebase === 'undefined') {
+                addLog('❌ ERRO: Firebase SDK não foi carregado', 'error');
+                updateStatus('ERRO: Firebase SDK não foi carregado. Verifique sua conexão com a internet.', 'error');
+                return;
+            } else {
+                addLog('✅ Firebase SDK carregado com sucesso!', 'success');
+            }
+            
+            // Teste 2: Verificar se o firestore foi carregado
+            addLog('Teste 2: Verificando se o Firestore foi carregado...');
+            if (typeof firebase.firestore === 'undefined') {
+                addLog('❌ ERRO: Firestore não foi carregado', 'error');
+                updateStatus('ERRO: Firestore não foi carregado.', 'error');
+                return;
+            } else {
+                addLog('✅ Firestore carregado com sucesso!', 'success');
+            }
+            
+            // Teste 3: Inicializar Firebase
+            addLog('Teste 3: Inicializando Firebase...');
+            try {
+                const firebaseConfig = {
+                    apiKey: "AIzaSyCYQm0K_4EdKHvvXOs81raKmstmAsRdT6g",
+                    authDomain: "controlemeubolso.firebaseapp.com",
+                    databaseURL: "https://controlemeubolso-default-rtdb.firebaseio.com",
+                    projectId: "controlemeubolso",
+                    storageBucket: "controlemeubolso.firebasestorage.app",
+                    messagingSenderId: "369393280169",
+                    appId: "1:369393280169:web:0b0d768f074e0ff4c775b8",
+                    measurementId: "G-0EYHJF137F"
+                };
+                
+                firebase.initializeApp(firebaseConfig);
+                addLog('✅ Firebase inicializado com sucesso!', 'success');
+            } catch (error) {
+                addLog(`❌ ERRO: Falha ao inicializar Firebase: ${error.message}`, 'error');
+                updateStatus(`ERRO: Falha ao inicializar Firebase: ${error.message}`, 'error');
+                return;
+            }
+            
+            // Teste 4: Obter instância do Firestore
+            addLog('Teste 4: Obtendo instância do Firestore...');
+            try {
+                const db = firebase.firestore();
+                addLog('✅ Instância do Firestore obtida com sucesso!', 'success');
+                addLog(`📋 Database object: ${db}`, 'info');
+            } catch (error) {
+                addLog(`❌ ERRO: Falha ao obter instância do Firestore: ${error.message}`, 'error');
+                updateStatus(`ERRO: Falha ao obter instância do Firestore: ${error.message}`, 'error');
+                return;
+            }
+            
+            // Teste 5: Testar conexão com o Firestore
+            addLog('Teste 5: Testando conexão com o Firestore...');
+            try {
+                const db = firebase.firestore();
+                
+                // Tentar uma consulta simples
+                db.collection('connections').add({
+                    test: true,
+                    timestamp: new Date().toISOString()
+                }).then(docRef => {
+                    addLog(`✅ Conexão com Firestore bem sucedida!`, 'success');
+                    addLog(`📝 Documento de teste criado com ID: ${docRef.id}`, 'success');
+                    updateStatus('✅ Todos os testes passaram! O Firebase está funcionando corretamente.', 'success');
+                    
+                    // Limpar o documento de teste
+                    db.collection('connections').doc(docRef.id).delete()
+                        .then(() => {
+                            addLog('🧹 Documento de teste removido', 'info');
+                        })
+                        .catch(error => {
+                            addLog(`⚠️ Aviso: Não foi possível remover o documento de teste: ${error.message}`, 'warning');
+                        });
+                    
+                }).catch(error => {
+                    addLog(`❌ ERRO: Falha na conexão com Firestore: ${error.message}`, 'error');
+                    updateStatus(`ERRO: Falha na conexão com Firestore: ${error.message}`, 'error');
+                });
+                
+            } catch (error) {
+                addLog(`❌ ERRO: Exceção ao testar conexão: ${error.message}`, 'error');
+                updateStatus(`ERRO: Exceção ao testar conexão: ${error.message}`, 'error');
+            }
+        }
+        
+        // Iniciar teste automaticamente quando a página carregar
+        window.addEventListener('load', function() {
+            setTimeout(testConnection, 1000);
+        });
+    </script>
+</body>
+</html>
