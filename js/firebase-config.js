@@ -1,4 +1,4 @@
-// js/firebase-config.js
+// Configuração do Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyCYQm0K_4EdKHvvXOs81raKmstmAsRdT6g",
   authDomain: "controlemeubolso.firebaseapp.com",
@@ -10,10 +10,20 @@ const firebaseConfig = {
   measurementId: "G-0EYHJF137F"
 };
 
-// Inicializar Firebase
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+// Importar Firebase SDK
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
+import { getFirestore } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 
-// Disponibilizar globalmente
-window.db = db;
+// Inicializar Firebase
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// Exportar para uso em outros módulos
+export { firebaseConfig, db, app };
+
+// Tornar disponível globalmente para compatibilidade
 window.firebaseConfig = firebaseConfig;
+window.db = db;
+window.app = app;
+
+console.log("✅ Firebase configurado com sucesso!");
