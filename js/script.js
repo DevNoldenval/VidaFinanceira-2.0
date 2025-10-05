@@ -1,4 +1,4 @@
-   import { db } from "./firebase-config";
+   import { db } from "./js/firebase-config";
    import { collection, getDocs, query, where, orderBy, limit, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
    
    // Esperar o Firebase carregar
