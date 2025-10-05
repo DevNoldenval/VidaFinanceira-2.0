@@ -1,4 +1,4 @@
-import { db } from '.js/firebase-config.js';
+import { db } from './js/firebase-config.js';
 import { collection, getDocs, query, where, orderBy, limit, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -316,4 +316,5 @@ function formatarData(data) {
     month: '2-digit',
     year: '2-digit'
   });
+
 }
