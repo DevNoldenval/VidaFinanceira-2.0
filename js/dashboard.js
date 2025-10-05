@@ -316,4 +316,5 @@ function formatarData(data) {
     month: '2-digit',
     year: '2-digit'
   });
+
 }
