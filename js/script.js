@@ -1,1666 +1,1129 @@
-// js/script.js
+// Classe principal do aplicativo
+class FinanFacil {
+    constructor() {
+        this.db = window.db;
+        this.transactions = [];
+        this.cards = [];
+        this.users = [];
+        this.currentUser = 'user1';
+        this.editingTransactionId = null;
+        this.editingCardId = null;
+        this.editingUserId = null;
+        
+        this.init();
+    }
 
-// Importar configuração do Firebase
-import { firebaseConfig, db, app } from './firebase-config.js';
+    init() {
+        this.setupEventListeners();
+        this.loadFromFirebase();
+        this.setupDefaultUsers();
+        
+        // Definir data atual como padrão
+        const dateInput = document.getElementById('transactionDate');
+        if (dateInput) {
+            dateInput.valueAsDate = new Date();
+        }
 
-// Importar funções do Firebase
-import { 
-  collection, getDocs, query, where, orderBy, limit, 
-  doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp 
-} from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
+        // Preencher anos no relatório
+        this.populateReportYears();
+    }
 
-// Verificar se o Firebase foi carregado
-if (typeof db === 'undefined') {
-  console.error('❌ Firebase não foi carregado. Verifique a conexão com a internet.');
-  alert('Erro ao carregar o Firebase. Verifique sua conexão.');
-  throw new Error('Firebase não carregado');
-}
+    setupEventListeners() {
+        // Eventos de transações
+        const addTransactionBtn = document.getElementById('addTransactionBtn');
+        const closeTransactionModal = document.getElementById('closeTransactionModal');
+        const cancelTransaction = document.getElementById('cancelTransaction');
+        const transactionForm = document.getElementById('transactionForm');
+        const transactionPaymentMethod = document.getElementById('transactionPaymentMethod');
+        const installmentTypeRadios = document.querySelectorAll('input[name="installmentType"]');
 
-console.log("✅ Firebase SDK carregado com sucesso!");
+        if (addTransactionBtn) addTransactionBtn.addEventListener('click', () => this.openTransactionModal());
+        if (closeTransactionModal) closeTransactionModal.addEventListener('click', () => this.closeTransactionModal());
+        if (cancelTransaction) cancelTransaction.addEventListener('click', () => this.closeTransactionModal());
+        if (transactionForm) transactionForm.addEventListener('submit', (e) => this.saveTransaction(e));
+        if (transactionPaymentMethod) transactionPaymentMethod.addEventListener('change', () => this.handlePaymentMethodChange());
+        
+        installmentTypeRadios.forEach(radio => {
+            radio.addEventListener('change', () => this.handleInstallmentTypeChange());
+        });
 
-// Esperar o DOM carregar
-document.addEventListener('DOMContentLoaded', async () => {
-    console.log("🚀 Iniciando aplicação...");
-    showLoading();
-    
-    try {
-        // Inicializar dados
-        let currentUser = 'cardUserId';
-        let transactions = [];
-        let cards = [];
-        let users = [];
+        // Eventos de cartões
+        const addCardBtn = document.getElementById('addCardBtn');
+        const closeCardModal = document.getElementById('closeCardModal');
+        const cancelCard = document.getElementById('cancelCard');
+        const cardForm = document.getElementById('cardForm');
 
-        // Variável para armazenar o ID do item sendo editado
-        let editingTransactionId = null;
-        let editingCardId = null;
-        let editingUserId = null;
+        if (addCardBtn) addCardBtn.addEventListener('click', () => this.openCardModal());
+        if (closeCardModal) closeCardModal.addEventListener('click', () => this.closeCardModal());
+        if (cancelCard) cancelCard.addEventListener('click', () => this.closeCardModal());
+        if (cardForm) cardForm.addEventListener('submit', (e) => this.saveCard(e));
 
-        // Inicializar aplicativo
-        await initApp();
+        // Eventos de usuários
+        const addUserBtn = document.getElementById('addUserBtn');
+        const closeUserModal = document.getElementById('closeUserModal');
+        const cancelUser = document.getElementById('cancelUser');
+        const userForm = document.getElementById('userForm');
 
-        async function initApp() {
-            // Definir data atual como padrão
-            const dateInput = document.getElementById('transactionDate');
-            if (dateInput) {
-                dateInput.valueAsDate = new Date();
+        if (addUserBtn) addUserBtn.addEventListener('click', () => this.openUserModal());
+        if (closeUserModal) closeUserModal.addEventListener('click', () => this.closeUserModal());
+        if (cancelUser) cancelUser.addEventListener('click', () => this.closeUserModal());
+        if (userForm) userForm.addEventListener('submit', (e) => this.saveUser(e));
+
+        // Eventos de relatório
+        const generateInvoiceBtn = document.getElementById('generateInvoiceBtn');
+        const closeInvoiceReportModal = document.getElementById('closeInvoiceReportModal');
+        const cancelInvoiceReport = document.getElementById('cancelInvoiceReport');
+        const generateInvoiceReport = document.getElementById('generateInvoiceReport');
+
+        if (generateInvoiceBtn) generateInvoiceBtn.addEventListener('click', () => this.openInvoiceReportModal());
+        if (closeInvoiceReportModal) closeInvoiceReportModal.addEventListener('click', () => this.closeInvoiceReportModal());
+        if (cancelInvoiceReport) cancelInvoiceReport.addEventListener('click', () => this.closeInvoiceReportModal());
+        if (generateInvoiceReport) generateInvoiceReport.addEventListener('click', () => this.generateInvoiceReport());
+
+        // Eventos de abas
+        const tabs = document.querySelectorAll('.tab');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabId = tab.getAttribute('data-tab');
+                this.openTab(tabId);
+            });
+        });
+
+        // Evento de usuário
+        const userSelector = document.getElementById('userSelector');
+        if (userSelector) userSelector.addEventListener('change', (e) => this.changeUser(e));
+    }
+
+    setupDefaultUsers() {
+        // Verificar se já existem usuários
+        this.db.collection('users').get().then(snapshot => {
+            if (snapshot.empty) {
+                // Criar usuários padrão
+                const defaultUsers = [
+                    { name: 'Noldenval', email: '', avatar: 'N', createdAt: firebase.firestore.FieldValue.serverTimestamp() },
+                    { name: 'Eliane', email: '', avatar: 'E', createdAt: firebase.firestore.FieldValue.serverTimestamp() }
+                ];
+
+                defaultUsers.forEach(user => {
+                    this.db.collection('users').add(user);
+                });
             }
+        });
+    }
 
-            // Carregar dados do Firebase
-            await loadFromFirebase();
-
-            // Adicionar eventos
-            setupEventListeners();
+    async loadFromFirebase() {
+        try {
+            // Carregar transações
+            const transactionsSnapshot = await this.db.collection('transactions')
+                .orderBy('createdAt', 'desc')
+                .get();
             
-            // Esconder loading após inicialização
-            hideLoading();
+            this.transactions = [];
+            transactionsSnapshot.forEach(doc => {
+                const transaction = doc.data();
+                transaction.id = doc.id;
+                this.transactions.push(transaction);
+            });
+
+            // Carregar cartões
+            const cardsSnapshot = await this.db.collection('cards').get();
+            this.cards = [];
+            cardsSnapshot.forEach(doc => {
+                const card = doc.data();
+                card.id = doc.id;
+                this.cards.push(card);
+            });
+
+            // Carregar usuários
+            const usersSnapshot = await this.db.collection('users').get();
+            this.users = [];
+            usersSnapshot.forEach(doc => {
+                const user = doc.data();
+                user.id = doc.id;
+                this.users.push(user);
+            });
+
+            // Atualizar interfaces
+            this.updateDashboard();
+            this.updateTransactionsTable();
+            this.updateCards();
+            this.updateUsers();
+            this.populateUserSelector();
+            this.populateCardSelects();
+
+        } catch (error) {
+            console.error('Erro ao carregar dados do Firebase:', error);
+            this.showNotification('Erro ao carregar dados', 'error');
         }
+    }
 
-        function setupEventListeners() {
-            // Elementos do DOM
-            const userSelector = document.getElementById('userSelector');
-            const addTransactionBtn = document.getElementById('addTransactionBtn');
-            const closeTransactionModal = document.getElementById('closeTransactionModal');
-            const cancelTransaction = document.getElementById('cancelTransaction');
-            const transactionForm = document.getElementById('transactionForm');
-            const addCardBtn = document.getElementById('addCardBtn');
-            const closeCardModal = document.getElementById('closeCardModal');
-            const cancelCard = document.getElementById('cancelCard');
-            const cardForm = document.getElementById('cardForm');
-            const addUserBtn = document.getElementById('addUserBtn');
-            const closeUserModal = document.getElementById('closeUserModal');
-            const cancelUser = document.getElementById('cancelUser');
-            const userForm = document.getElementById('userForm');
-            const generateInvoiceBtn = document.getElementById('generateInvoiceBtn');
-            const closeInvoiceReportModal = document.getElementById('closeInvoiceReportModal');
-            const cancelInvoiceReport = document.getElementById('cancelInvoiceReport');
-            const generateInvoiceReport = document.getElementById('generateInvoiceReport');
-            const tabs = document.querySelectorAll('.tab');
+    // Métodos de Dashboard
+    updateDashboard() {
+        const incomeValue = document.getElementById('incomeValue');
+        const expenseValue = document.getElementById('expenseValue');
+        const balanceValue = document.getElementById('balanceValue');
 
-            // Eventos relacionados a transações
-            if (userSelector) userSelector.addEventListener('change', changeUser);
-            if (addTransactionBtn) addTransactionBtn.addEventListener('click', openTransactionModal);
-            if (closeTransactionModal) closeTransactionModal.addEventListener('click', closeTransactionModalFunc);
-            if (cancelTransaction) cancelTransaction.addEventListener('click', closeTransactionModalFunc);
-            if (transactionForm) transactionForm.addEventListener('submit', saveTransaction);
+        if (!incomeValue || !expenseValue || !balanceValue) return;
 
-            // Eventos relacionados a cartões
-            if (addCardBtn) addCardBtn.addEventListener('click', openCardModal);
-            if (closeCardModal) closeCardModal.addEventListener('click', closeCardModalFunc);
-            if (cancelCard) cancelCard.addEventListener('click', closeCardModalFunc);
-            if (cardForm) cardForm.addEventListener('submit', saveCard);
+        const currentMonth = new Date().getMonth();
+        const currentYear = new Date().getFullYear();
 
-            // Eventos relacionados a usuários
-            if (addUserBtn) addUserBtn.addEventListener('click', openUserModal);
-            if (closeUserModal) closeUserModal.addEventListener('click', closeUserModalFunc);
-            if (cancelUser) cancelUser.addEventListener('click', closeUserModalFunc);
-            if (userForm) userForm.addEventListener('submit', saveUser);
+        const income = this.transactions
+            .filter(t => {
+                const transactionDate = new Date(t.date);
+                return t.type === 'income' &&
+                    transactionDate.getMonth() === currentMonth &&
+                    transactionDate.getFullYear() === currentYear;
+            })
+            .reduce((sum, t) => sum + t.value, 0);
 
-            // Eventos relacionados a relatório de fatura
-            if (generateInvoiceBtn) generateInvoiceBtn.addEventListener('click', openInvoiceReportModal);
-            if (closeInvoiceReportModal) closeInvoiceReportModal.addEventListener('click', closeInvoiceReportModalFunc);
-            if (cancelInvoiceReport) cancelInvoiceReport.addEventListener('click', closeInvoiceReportModalFunc);
-            if (generateInvoiceReport) generateInvoiceReport.addEventListener('click', generateInvoiceReportFunc);
+        const expense = this.transactions
+            .filter(t => {
+                const transactionDate = new Date(t.date);
+                return t.type === 'expense' &&
+                    transactionDate.getMonth() === currentMonth &&
+                    transactionDate.getFullYear() === currentYear;
+            })
+            .reduce((sum, t) => sum + t.value, 0);
 
-            // Eventos relacionados a abas
-            if (tabs) {
-                tabs.forEach(tab => {
-                    tab.addEventListener('click', () => {
-                        const tabId = tab.getAttribute('data-tab');
-                        openTab(tabId);
-                    });
-                });
+        const balance = income - expense;
+
+        incomeValue.textContent = this.formatCurrency(income);
+        expenseValue.textContent = this.formatCurrency(expense);
+        balanceValue.textContent = this.formatCurrency(balance);
+
+        // Atualizar cor do saldo
+        balanceValue.className = `card-value balance ${balance >= 0 ? 'income' : 'expense'}`;
+    }
+
+    // Métodos de Transações
+    openTransactionModal(transactionId = null) {
+        const modal = document.getElementById('transactionModal');
+        if (!modal) return;
+
+        modal.style.display = 'flex';
+        modal.classList.add('show');
+
+        // Preencher selects
+        this.populateCardSelect();
+        this.populateCardUserSelect();
+
+        if (transactionId) {
+            const transaction = this.transactions.find(t => t.id === transactionId);
+            if (transaction) {
+                this.editingTransactionId = transactionId;
+                this.fillTransactionForm(transaction);
+                document.querySelector('#transactionModal .modal-title').textContent = 'Editar Transação';
             }
-
-            // Eventos relacionados a método de pagamento
-            const paymentMethod = document.getElementById('transactionPaymentMethod');
-            if (paymentMethod) {
-                paymentMethod.addEventListener('change', handlePaymentMethodChange);
-            }
-
-            // Eventos relacionados a tipo de parcelamento
-            const installmentTypeRadios = document.querySelectorAll('input[name="installmentType"]');
-            if (installmentTypeRadios) {
-                installmentTypeRadios.forEach(radio => {
-                    radio.addEventListener('change', handleInstallmentTypeChange);
-                });
-            }
+        } else {
+            this.editingTransactionId = null;
+            this.clearTransactionForm();
+            document.querySelector('#transactionModal .modal-title').textContent = 'Nova Transação';
         }
+    }
 
-        // Funções de usuário
-        function changeUser() {
-            const userSelector = document.getElementById('userSelector');
-            const userAvatar = document.getElementById('userAvatar');
+    closeTransactionModal() {
+        const modal = document.getElementById('transactionModal');
+        if (modal) {
+            modal.style.display = 'none';
+            modal.classList.remove('show');
+        }
+        this.clearTransactionForm();
+        this.editingTransactionId = null;
+    }
 
-            if (userSelector && userAvatar) {
-                currentUser = userSelector.value;
-                userAvatar.textContent = getUserAvatar(currentUser);
-                updateDashboard();
-                updateTransactionsTable();
+    clearTransactionForm() {
+        const form = document.getElementById('transactionForm');
+        if (form) form.reset();
+        
+        const dateInput = document.getElementById('transactionDate');
+        if (dateInput) dateInput.valueAsDate = new Date();
+
+        // Esconder campos condicionais
+        this.hideConditionalFields();
+    }
+
+    fillTransactionForm(transaction) {
+        document.getElementById('transactionType').value = transaction.type;
+        document.getElementById('transactionDescription').value = transaction.description;
+        document.getElementById('transactionCategory').value = transaction.category;
+        document.getElementById('transactionPaymentMethod').value = transaction.paymentMethod;
+        document.getElementById('transactionValue').value = transaction.value;
+        document.getElementById('transactionDate').value = transaction.date;
+        document.getElementById('transactionUser').value = transaction.user;
+
+        // Mostrar/esconder campos condicionais
+        this.handlePaymentMethodChange();
+
+        if (transaction.paymentMethod === 'credit-card' && transaction.cardId) {
+            document.getElementById('transactionCard').value = transaction.cardId;
+            if (transaction.cardUserId) {
+                document.getElementById('transactionCardUser').value = transaction.cardUserId;
             }
-        }
-
-        function getUserAvatar(userId) {
-            const user = users.find(u => u.id === userId);
-            return user ? user.avatar : 'U';
-        }
-
-        function getUserName(userId) {
-            const user = users.find(u => u.id === userId);
-            return user ? user.name : 'Usuário';
-        }
-
-        // Funções do dashboard
-        function updateDashboard() {
-            const incomeValue = document.getElementById('incomeValue');
-            const expenseValue = document.getElementById('expenseValue');
-            const balanceValue = document.getElementById('balanceValue');
-            const user1Expense = document.getElementById('user1Expense');
-            const user2Expense = document.getElementById('user2Expense');
-
-            if (!incomeValue || !expenseValue || !balanceValue || !user1Expense || !user2Expense) {
-                return;
-            }
-
-            const currentMonth = new Date().getMonth();
-            const currentYear = new Date().getFullYear();
-
-            const income = transactions
-                .filter(t => {
-                    const transactionDate = new Date(t.date);
-                    return t.type === 'income' &&
-                        transactionDate.getMonth() === currentMonth &&
-                        transactionDate.getFullYear() === currentYear;
-                })
-                .reduce((sum, t) => sum + t.value, 0);
-
-            const expense = transactions
-                .filter(t => {
-                    const transactionDate = new Date(t.date);
-                    return t.type === 'expense' &&
-                        transactionDate.getMonth() === currentMonth &&
-                        transactionDate.getFullYear() === currentYear;
-                })
-                .reduce((sum, t) => sum + t.value, 0);
-
-            const balance = income - expense;
-
-            incomeValue.textContent = formatCurrency(income);
-            expenseValue.textContent = formatCurrency(expense);
-            balanceValue.textContent = formatCurrency(balance);
-
-            // Atualizar cor do saldo
-            if (balance >= 0) {
-                balanceValue.style.color = 'var(--success)';
-            } else {
-                balanceValue.style.color = 'var(--danger)';
-            }
-
-            // Atualizar comparação de usuários
-            const user1Expenses = transactions
-                .filter(t => {
-                    const transactionDate = new Date(t.date);
-                    return t.type === 'expense' &&
-                        t.user === 'user1' &&
-                        transactionDate.getMonth() === currentMonth &&
-                        transactionDate.getFullYear() === currentYear;
-                })
-                .reduce((sum, t) => sum + t.value, 0);
-
-            const user2Expenses = transactions
-                .filter(t => {
-                    const transactionDate = new Date(t.date);
-                    return t.type === 'expense' &&
-                        t.user === 'user2' &&
-                        transactionDate.getMonth() === currentMonth &&
-                        transactionDate.getFullYear() === currentYear;
-                })
-                .reduce((sum, t) => sum + t.value, 0);
-
-            user1Expense.textContent = formatCurrency(user1Expenses);
-            user2Expense.textContent = formatCurrency(user2Expenses);
-        }
-
-        // Funções de transações
-        function openTransactionModal(transactionId = null) {
-            const transactionModal = document.getElementById('transactionModal');
-            if (transactionModal) {
-                transactionModal.style.display = 'flex';
-
-                // Preencher o select de cartões
-                populateCardSelect();
-
-                // Preencher o select de usuários
-                populateCardUserSelect();
-
-                // Se for uma edição, preencher o formulário com os dados da transação
-                if (transactionId) {
-                    const transaction = transactions.find(t => t.id === transactionId);
-                    if (transaction) {
-                        editingTransactionId = transactionId;
-
-                        // Preencher campos do formulário
-                        document.getElementById('transactionType').value = transaction.type;
-                        document.getElementById('transactionDescription').value = transaction.description;
-                        document.getElementById('transactionCategory').value = transaction.category;
-                        document.getElementById('transactionPaymentMethod').value = transaction.paymentMethod;
-                        document.getElementById('transactionValue').value = transaction.value;
-                        document.getElementById('transactionDate').value = transaction.date;
-                        document.getElementById('transactionUser').value = transaction.user;
-
-                        // Se for pagamento com cartão, preencher campos relacionados
-                        if (transaction.paymentMethod === 'credit-card' && transaction.cardId) {
-                            document.getElementById('transactionCard').value = transaction.cardId;
-                            document.getElementById('transactionCardUser').value = transaction.cardUserId || transaction.user;
-
-                            // Mostrar campos relacionados a cartão
-                            document.getElementById('cardSelectionGroup').style.display = 'block';
-                            document.getElementById('cardUserGroup').style.display = 'block';
-                            document.getElementById('installmentTypeGroup').style.display = 'block';
-
-                            // Se for parcelado, preencher campos de parcelamento
-                            if (transaction.installment) {
-                                document.querySelector('input[name="installmentType"][value="installment"]').checked = true;
-                                document.getElementById('installmentsGroup').style.display = 'block';
-                                document.getElementById('transactionInstallments').value = transaction.installment.total;
-                            } else {
-                                document.querySelector('input[name="installmentType"][value="full"]').checked = true;
-                                document.getElementById('installmentsGroup').style.display = 'none';
-                            }
-                        } else {
-                            // Esconder campos relacionados a cartão
-                            document.getElementById('cardSelectionGroup').style.display = 'none';
-                            document.getElementById('cardUserGroup').style.display = 'none';
-                            document.getElementById('installmentTypeGroup').style.display = 'none';
-                            document.getElementById('installmentsGroup').style.display = 'none';
-                        }
-
-                        // Alterar título do modal
-                        document.querySelector('#transactionModal .modal-header h3').textContent = 'Editar Transação';
-                    }
-                } else {
-                    editingTransactionId = null;
-                    // Resetar formulário
-                    document.getElementById('transactionForm').reset();
-                    document.getElementById('transactionDate').valueAsDate = new Date();
-
-                    // Esconder campos relacionados a cartão
-                    document.getElementById('cardSelectionGroup').style.display = 'none';
-                    document.getElementById('cardUserGroup').style.display = 'none';
-                    document.getElementById('installmentTypeGroup').style.display = 'none';
-                    document.getElementById('installmentsGroup').style.display = 'none';
-
-                    // Alterar título do modal
-                    document.querySelector('#transactionModal .modal-header h3').textContent = 'Adicionar Transação';
-                }
+            if (transaction.installment) {
+                document.querySelector('input[name="installmentType"][value="installment"]').checked = true;
+                document.getElementById('transactionInstallments').value = transaction.installment.total;
+                this.handleInstallmentTypeChange();
             }
         }
+    }
 
-        function closeTransactionModalFunc() {
-            const transactionModal = document.getElementById('transactionModal');
-            const transactionForm = document.getElementById('transactionForm');
-            const dateInput = document.getElementById('transactionDate');
+    handlePaymentMethodChange() {
+        const paymentMethod = document.getElementById('transactionPaymentMethod');
+        const cardSelectionGroup = document.getElementById('cardSelectionGroup');
+        const cardUserGroup = document.getElementById('cardUserGroup');
+        const installmentTypeGroup = document.getElementById('installmentTypeGroup');
 
-            if (transactionModal) {
-                transactionModal.style.display = 'none';
-            }
-
-            if (transactionForm) {
-                transactionForm.reset();
-
-                // Resetar campos dependentes
-                const cardSelectionGroup = document.getElementById('cardSelectionGroup');
-                const cardUserGroup = document.getElementById('cardUserGroup');
-                const installmentTypeGroup = document.getElementById('installmentTypeGroup');
-                const installmentsGroup = document.getElementById('installmentsGroup');
-
-                if (cardSelectionGroup) cardSelectionGroup.style.display = 'none';
-                if (cardUserGroup) cardUserGroup.style.display = 'none';
-                if (installmentTypeGroup) installmentTypeGroup.style.display = 'none';
-                if (installmentsGroup) installmentsGroup.style.display = 'none';
-            }
-
-            if (dateInput) {
-                dateInput.valueAsDate = new Date();
-            }
-
-            // Resetar ID de edição
-            editingTransactionId = null;
+        if (paymentMethod.value === 'credit-card') {
+            if (cardSelectionGroup) cardSelectionGroup.style.display = 'block';
+            if (cardUserGroup) cardUserGroup.style.display = 'block';
+            if (installmentTypeGroup) installmentTypeGroup.style.display = 'block';
+        } else {
+            this.hideConditionalFields();
         }
+    }
 
-        function handlePaymentMethodChange() {
-            const paymentMethod = document.getElementById('transactionPaymentMethod');
-            const cardSelectionGroup = document.getElementById('cardSelectionGroup');
-            const cardUserGroup = document.getElementById('cardUserGroup');
-            const installmentTypeGroup = document.getElementById('installmentTypeGroup');
+    handleInstallmentTypeChange() {
+        const installmentType = document.querySelector('input[name="installmentType"]:checked');
+        const installmentsGroup = document.getElementById('installmentsGroup');
 
-            if (!paymentMethod) return;
-
-            if (paymentMethod.value === 'credit-card') {
-                if (cardSelectionGroup) cardSelectionGroup.style.display = 'block';
-                if (cardUserGroup) cardUserGroup.style.display = 'block';
-                if (installmentTypeGroup) installmentTypeGroup.style.display = 'block';
-            } else {
-                if (cardSelectionGroup) cardSelectionGroup.style.display = 'none';
-                if (cardUserGroup) cardUserGroup.style.display = 'none';
-                if (installmentTypeGroup) installmentTypeGroup.style.display = 'none';
-
-                const installmentsGroup = document.getElementById('installmentsGroup');
-                if (installmentsGroup) installmentsGroup.style.display = 'none';
-            }
+        if (installmentType && installmentType.value === 'installment' && installmentsGroup) {
+            installmentsGroup.style.display = 'block';
+        } else if (installmentsGroup) {
+            installmentsGroup.style.display = 'none';
         }
+    }
 
-        function handleInstallmentTypeChange() {
-            const installmentType = document.querySelector('input[name="installmentType"]:checked');
-            const installmentsGroup = document.getElementById('installmentsGroup');
+    hideConditionalFields() {
+        const fields = ['cardSelectionGroup', 'cardUserGroup', 'installmentTypeGroup', 'installmentsGroup'];
+        fields.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field) field.style.display = 'none';
+        });
+    }
 
-            if (!installmentType || !installmentsGroup) return;
+    async saveTransaction(e) {
+        e.preventDefault();
 
-            if (installmentType.value === 'installment') {
-                installmentsGroup.style.display = 'block';
-            } else {
-                installmentsGroup.style.display = 'none';
-            }
-        }
-
-        function populateCardSelect() {
-            const cardSelect = document.getElementById('transactionCard');
-
-            if (!cardSelect) return;
-
-            // Limpar opções existentes
-            cardSelect.innerHTML = '<option value="">Selecione um cartão</option>';
-
-            // Adicionar cartões
-            if (cards && cards.length > 0) {
-                cards.forEach(card => {
-                    const option = document.createElement('option');
-                    option.value = card.id;
-                    option.textContent = card.name;
-                    cardSelect.appendChild(option);
-                });
-            }
-        }
-
-        function populateCardUserSelect() {
-            const userSelect = document.getElementById('transactionCardUser');
-
-            if (!userSelect) return;
-
-            // Limpar opções existentes
-            userSelect.innerHTML = '<option value="">Selecione um usuário</option>';
-
-            // Adicionar usuários
-            if (users && users.length > 0) {
-                users.forEach(user => {
-                    const option = document.createElement('option');
-                    option.value = user.id;
-                    option.textContent = user.name;
-                    userSelect.appendChild(option);
-                });
-            }
-        }
-
-        async function saveTransaction(e) {
-            e.preventDefault();
-
-            // Obter elementos do formulário
-            const transactionType = document.getElementById('transactionType');
-            const transactionDescription = document.getElementById('transactionDescription');
-            const transactionCategory = document.getElementById('transactionCategory');
-            const transactionPaymentMethod = document.getElementById('transactionPaymentMethod');
-            const transactionCard = document.getElementById('transactionCard');
-            const transactionCardUser = document.getElementById('transactionCardUser');
-            const transactionValue = document.getElementById('transactionValue');
-            const transactionDate = document.getElementById('transactionDate');
-            const transactionUser = document.getElementById('transactionUser');
-            const installmentType = document.querySelector('input[name="installmentType"]:checked');
-            const transactionInstallments = document.getElementById('transactionInstallments');
-
-            // Validação de campos obrigatórios
-            if (!transactionType || !transactionType.value) {
-                showNotification('Selecione o tipo da transação.', 'error');
-                return;
-            }
-
-            if (!transactionDescription || !transactionDescription.value) {
-                showNotification('Informe a descrição da transação.', 'error');
-                return;
-            }
-
-            if (!transactionCategory || !transactionCategory.value) {
-                showNotification('Selecione a categoria da transação.', 'error');
-                return;
-            }
-
-            if (!transactionPaymentMethod || !transactionPaymentMethod.value) {
-                showNotification('Selecione o método de pagamento.', 'error');
-                return;
-            }
-
-            if (!transactionValue || !transactionValue.value) {
-                showNotification('Informe o valor da transação.', 'error');
-                return;
-            }
-
-            if (!transactionDate || !transactionDate.value) {
-                showNotification('Informe a data da transação.', 'error');
-                return;
-            }
-
-            if (!transactionUser || !transactionUser.value) {
-                showNotification('Selecione o usuário da transação.', 'error');
-                return;
-            }
-
-            // Validação adicional para cartão de crédito
-            if (transactionPaymentMethod.value === 'credit-card') {
-                if (!transactionCard || !transactionCard.value) {
-                    showNotification('Selecione o cartão de crédito.', 'error');
-                    return;
-                }
-            }
-
-            // Validação adicional para parcelamento
-            if (transactionPaymentMethod.value === 'credit-card' &&
-                installmentType && installmentType.value === 'installment') {
-                if (!transactionInstallments || !transactionInstallments.value || transactionInstallments.value < 2) {
-                    showNotification('Informe a quantidade de parcelas (mínimo 2).', 'error');
-                    return;
-                }
-            }
-
-            const baseTransaction = {
-                type: transactionType.value,
-                description: transactionDescription.value,
-                category: transactionCategory.value,
-                paymentMethod: transactionPaymentMethod.value,
-                value: parseFloat(transactionValue.value),
-                date: transactionDate.value,
-                user: transactionUser.value,
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
+        try {
+            const formData = {
+                type: document.getElementById('transactionType').value,
+                description: document.getElementById('transactionDescription').value,
+                category: document.getElementById('transactionCategory').value,
+                paymentMethod: document.getElementById('transactionPaymentMethod').value,
+                value: parseFloat(document.getElementById('transactionValue').value),
+                date: document.getElementById('transactionDate').value,
+                user: document.getElementById('transactionUser').value,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             };
 
-            // Se for pagamento com cartão de crédito, adicionar informações do cartão
-            if (transactionPaymentMethod.value === 'credit-card' && transactionCard && transactionCard.value) {
-                baseTransaction.cardId = transactionCard.value;
-                baseTransaction.cardUserId = transactionCardUser && transactionCardUser.value ? transactionCardUser.value : transactionUser.value;
-
-                const card = cards.find(c => c.id === transactionCard.value);
-                if (card) {
-                    baseTransaction.cardName = card.name;
+            // Adicionar informações de cartão se necessário
+            if (formData.paymentMethod === 'credit-card') {
+                const cardSelect = document.getElementById('transactionCard');
+                if (cardSelect && cardSelect.value) {
+                    formData.cardId = cardSelect.value;
+                    const cardUserSelect = document.getElementById('transactionCardUser');
+                    if (cardUserSelect && cardUserSelect.value) {
+                        formData.cardUserId = cardUserSelect.value;
+                    }
                 }
-            }
 
-            // Se for pagamento parcelado, criar as parcelas
-            if (transactionPaymentMethod.value === 'credit-card' &&
-                installmentType && installmentType.value === 'installment' &&
-                transactionInstallments && transactionInstallments.value > 1) {
-
-                const installmentsCount = parseInt(transactionInstallments.value);
-                const installmentValue = baseTransaction.value / installmentsCount;
-
-                // Encontrar o cartão para obter a data de fechamento
-                const card = cards.find(c => c.id === transactionCard.value);
-
-                if (card) {
-                    // Calcular as datas das parcelas com base na data de fechamento
-                    const transactionsToSave = [];
-
-                    for (let i = 1; i <= installmentsCount; i++) {
-                        const installmentTransaction = { ...baseTransaction };
-                        installmentTransaction.value = installmentValue;
-                        installmentTransaction.installment = {
-                            total: installmentsCount,
-                            current: i,
-                            description: `${i}/${installmentsCount}`
+                // Verificar parcelamento
+                const installmentType = document.querySelector('input[name="installmentType"]:checked');
+                if (installmentType && installmentType.value === 'installment') {
+                    const installmentsInput = document.getElementById('transactionInstallments');
+                    if (installmentsInput && installmentsInput.value) {
+                        formData.installment = {
+                            total: parseInt(installmentsInput.value),
+                            current: 1,
+                            description: `1/${installmentsInput.value}`
                         };
-                        installmentTransaction.parentTransactionId = null; // Será atualizado depois
-
-                        // Calcular a data da parcela
-                        const transactionDateValue = document.getElementById('transactionDate').value;
-                        const transactionDate = new Date(transactionDateValue);
-                        const closingDay = card.closingDay || 10;
-
-                        // Se a data da transação for após o dia de fechamento, a primeira parcela será no mês seguinte
-                        if (transactionDate.getDate() > closingDay) {
-                            transactionDate.setMonth(transactionDate.getMonth() + i);
-                        } else {
-                            transactionDate.setMonth(transactionDate.getMonth() + i - 1);
-                        }
-
-                        // Formatar a data como YYYY-MM-DD
-                        installmentTransaction.date = transactionDate.toISOString().split('T')[0];
-
-                        transactionsToSave.push(installmentTransaction);
                     }
-
-                    // Se for uma edição, excluir as parcelas existentes primeiro
-                    if (editingTransactionId) {
-                        // Encontrar todas as parcelas relacionadas
-                        const parentTransaction = transactions.find(t => t.id === editingTransactionId);
-                        const parentTransactionId = parentTransaction.parentTransactionId || editingTransactionId;
-
-                        const relatedTransactions = transactions.filter(t =>
-                            t.id === parentTransactionId || t.parentTransactionId === parentTransactionId
-                        );
-
-                        // Excluir todas as parcelas
-                        const deletePromises = relatedTransactions.map(t =>
-                            deleteDoc(doc(db, "transactions", t.id))
-                        );
-
-                        try {
-                            await Promise.all(deletePromises);
-                            // Remover do array local
-                            transactions = transactions.filter(t =>
-                                !relatedTransactions.some(rt => rt.id === t.id)
-                            );
-
-                            // Salvar as novas parcelas
-                            await saveInstallments(transactionsToSave);
-                        } catch (error) {
-                            console.error("Erro ao excluir transações parceladas: ", error);
-                            showNotification('Erro ao editar transação. Tente novamente.', 'error');
-                        }
-                    } else {
-                        // Salvar todas as parcelas
-                        await saveInstallments(transactionsToSave);
-                    }
-                } else {
-                    showNotification('Cartão não encontrado. Tente novamente.', 'error');
-                }
-            } else {
-                // Se for uma edição, atualizar a transação existente
-                if (editingTransactionId) {
-                    try {
-                        await updateDoc(doc(db, "transactions", editingTransactionId), baseTransaction);
-                        
-                        // Atualizar no array local
-                        const index = transactions.findIndex(t => t.id === editingTransactionId);
-                        if (index !== -1) {
-                            transactions[index] = { ...transactions[index], ...baseTransaction };
-                        }
-
-                        updateDashboard();
-                        updateTransactionsTable();
-                        updateCards();
-                        closeTransactionModalFunc();
-                        showNotification('Transação atualizada com sucesso!', 'success');
-                    } catch (error) {
-                        console.error("Erro ao atualizar transação: ", error);
-                        showNotification('Erro ao atualizar transação. Tente novamente.', 'error');
-                    }
-                } else {
-                    // Salvar transação única
-                    await saveSingleTransaction(baseTransaction);
                 }
             }
-        }
 
-        async function saveSingleTransaction(transaction) {
-            try {
-                const docRef = await addDoc(collection(db, "transactions"), transaction);
+            if (this.editingTransactionId) {
+                // Atualizar transação existente
+                await this.db.collection('transactions').doc(this.editingTransactionId).update(formData);
                 
-                // Adicionar ID gerado pelo Firestore
-                transaction.id = docRef.id;
-
-                // Adicionar ao array local
-                transactions.push(transaction);
-
-                updateDashboard();
-                updateTransactionsTable();
-                updateCards();
-                closeTransactionModalFunc();
-                showNotification('Transação adicionada com sucesso!', 'success');
-            } catch (error) {
-                console.error("Erro ao adicionar transação: ", error);
-                showNotification('Erro ao adicionar transação. Tente novamente.', 'error');
-            }
-        }
-
-        async function saveInstallments(transactionsToSave) {
-            try {
-                // Salvar a primeira transação para obter o ID pai
-                const docRef = await addDoc(collection(db, "transactions"), transactionsToSave[0]);
-                const parentTransactionId = docRef.id;
-                transactionsToSave[0].id = parentTransactionId;
-
-                // Atualizar as demais transações com o ID pai
-                const promises = [];
-
-                for (let i = 1; i < transactionsToSave.length; i++) {
-                    transactionsToSave[i].parentTransactionId = parentTransactionId;
-
-                    const promise = addDoc(collection(db, "transactions"), transactionsToSave[i])
-                        .then((childDocRef) => {
-                            transactionsToSave[i].id = childDocRef.id;
-                            return childDocRef;
-                        });
-
-                    promises.push(promise);
+                const index = this.transactions.findIndex(t => t.id === this.editingTransactionId);
+                if (index !== -1) {
+                    this.transactions[index] = { ...this.transactions[index], ...formData };
                 }
 
-                // Adicionar todas as transações ao array local
-                transactions.push(...transactionsToSave);
-
-                // Esperar todas as transações serem salvas
-                await Promise.all(promises);
-
-                updateDashboard();
-                updateTransactionsTable();
-                updateCards();
-                closeTransactionModalFunc();
-                showNotification(`Transação parcelada em ${transactionsToSave.length}x adicionada com sucesso!`, 'success');
-            } catch (error) {
-                console.error("Erro ao adicionar transações parceladas: ", error);
-                showNotification('Erro ao adicionar transações parceladas. Tente novamente.', 'error');
+                this.showNotification('Transação atualizada com sucesso!', 'success');
+            } else {
+                // Adicionar nova transação
+                const docRef = await this.db.collection('transactions').add(formData);
+                formData.id = docRef.id;
+                formData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                
+                this.transactions.unshift(formData);
+                this.showNotification('Transação adicionada com sucesso!', 'success');
             }
+
+            this.updateDashboard();
+            this.updateTransactionsTable();
+            this.updateCards();
+            this.closeTransactionModal();
+
+        } catch (error) {
+            console.error('Erro ao salvar transação:', error);
+            this.showNotification('Erro ao salvar transação', 'error');
+        }
+    }
+
+    updateTransactionsTable() {
+        const allTableBody = document.getElementById('transactionsTableBody');
+        const incomeTableBody = document.getElementById('incomeTableBody');
+        const expenseTableBody = document.getElementById('expenseTableBody');
+
+        if (!allTableBody || !incomeTableBody || !expenseTableBody) return;
+
+        // Limpar tabelas
+        allTableBody.innerHTML = '';
+        incomeTableBody.innerHTML = '';
+        expenseTableBody.innerHTML = '';
+
+        // Esconder loading e mostrar tabelas
+        this.hideLoading('all');
+        this.hideLoading('income');
+        this.hideLoading('expense');
+
+        if (this.transactions.length === 0) {
+            const emptyRow = '<tr><td colspan="8" style="text-align: center; padding: 2rem;">Nenhuma transação encontrada</td></tr>';
+            allTableBody.innerHTML = emptyRow;
+            incomeTableBody.innerHTML = emptyRow.replace('8', '8');
+            expenseTableBody.innerHTML = emptyRow.replace('8', '8');
+            return;
         }
 
-        function updateTransactionsTable() {
-            const allTableBody = document.getElementById('transactionsTableBody');
-            const incomeTableBody = document.getElementById('incomeTableBody');
-            const expenseTableBody = document.getElementById('expenseTableBody');
-            const allLoading = document.getElementById('allLoading');
-            const incomeLoading = document.getElementById('incomeLoading');
-            const expenseLoading = document.getElementById('expenseLoading');
-            const allTable = document.getElementById('allTable');
-            const incomeTable = document.getElementById('incomeTable');
-            const expenseTable = document.getElementById('expenseTable');
+        // Ordenar transações por data (mais recentes primeiro)
+        const sortedTransactions = [...this.transactions].sort((a, b) => {
+            return new Date(b.date) - new Date(a.date);
+        });
 
-            if (!allTableBody || !incomeTableBody || !expenseTableBody ||
-                !allLoading || !incomeLoading || !expenseLoading ||
-                !allTable || !incomeTable || !expenseTable) {
-                return;
+        sortedTransactions.forEach(transaction => {
+            const row = this.createTransactionRow(transaction);
+            
+            // Adicionar à tabela "Todas"
+            allTableBody.appendChild(row.cloneNode(true));
+            
+            // Adicionar à tabela específica
+            if (transaction.type === 'income') {
+                incomeTableBody.appendChild(row.cloneNode(true));
+            } else {
+                expenseTableBody.appendChild(row.cloneNode(true));
             }
+        });
+    }
 
-            // Limpar tabelas
-            allTableBody.innerHTML = '';
-            incomeTableBody.innerHTML = '';
-            expenseTableBody.innerHTML = '';
+    createTransactionRow(transaction) {
+        const row = document.createElement('tr');
+        
+        const typeClass = transaction.type === 'income' ? 'income' : 'expense';
+        const userText = this.getUserName(transaction.user);
+        const cardText = transaction.cardName || '-';
+        const installmentText = transaction.installment ? `Parcela ${transaction.installment.description}` : '-';
 
-            // Ordenar transações por data (mais recentes primeiro)
-            const sortedTransactions = [...transactions].sort((a, b) => {
-                const dateA = new Date(a.date);
-                const dateB = new Date(b.date);
-                return dateB - dateA;
-            });
+        row.innerHTML = `
+            <td>${transaction.description}</td>
+            <td>${this.getCategoryName(transaction.category)}</td>
+            <td>${this.formatDate(transaction.date)}</td>
+            <td class="${typeClass}">${transaction.type === 'income' ? '+' : '-'} ${this.formatCurrency(transaction.value)}</td>
+            <td>${userText}</td>
+            <td>${cardText}</td>
+            <td>${installmentText}</td>
+            <td>
+                <button class="btn-icon btn-edit" onclick="app.editTransaction('${transaction.id}')" title="Editar">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn-icon btn-delete" onclick="app.deleteTransaction('${transaction.id}')" title="Excluir">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
 
-            // Verificar se há transações
-            if (sortedTransactions.length === 0) {
-                allTableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem;">Nenhuma transação encontrada</td></tr>';
-                incomeTableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem;">Nenhuma receita encontrada</td></tr>';
-                expenseTableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem;">Nenhuma despesa encontrada</td></tr>';
+        return row;
+    }
 
-                // Esconder loading e mostrar tabelas
-                if (allLoading) allLoading.style.display = 'none';
-                if (incomeLoading) incomeLoading.style.display = 'none';
-                if (expenseLoading) expenseLoading.style.display = 'none';
-                if (allTable) allTable.style.display = 'table';
-                if (incomeTable) incomeTable.style.display = 'table';
-                if (expenseTable) expenseTable.style.display = 'table';
+    async deleteTransaction(id) {
+        if (!confirm('Tem certeza que deseja excluir esta transação?')) return;
 
-                return;
-            }
-
-            // Preencher tabelas
-            sortedTransactions.forEach(transaction => {
-                const row = document.createElement('tr');
-
-                const typeClass = transaction.type === 'income' ? 'type-income' : 'type-expense';
-                const userText = getUserName(transaction.user);
-
-                // Informações do cartão
-                let cardText = '-';
-                if (transaction.cardName) {
-                    cardText = transaction.cardName;
-                }
-
-                // Informações das parcelas
-                let installmentText = '-';
-                if (transaction.installment) {
-                    installmentText = `Parcela ${transaction.installment.description}`;
-                }
-
-                row.innerHTML = `
-                    <td>${transaction.description}</td>
-                    <td>${getCategoryName(transaction.category)}</td>
-                    <td>${formatDate(transaction.date)}</td>
-                    <td class="${typeClass}">${transaction.type === 'income' ? '+' : '-'} ${formatCurrency(transaction.value)}</td>
-                    <td>${userText}</td>
-                    <td>${cardText}</td>
-                    <td>${installmentText}</td>
-                    <td>
-                        <button class="btn-icon btn-editTrans" onclick="editTransaction('${transaction.id}')">
-                           <i class="fa-solid fa-pen"></i>
-                        </button>
-                        <button class="btn-icon btn-deleteTrans" onclick="deleteTransaction('${transaction.id}')">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </td>
-                `;
-
-                // Adicionar à tabela "Todas"
-                allTableBody.appendChild(row.cloneNode(true));
-
-                // Adicionar à tabela específica
-                if (transaction.type === 'income') {
-                    incomeTableBody.appendChild(row.cloneNode(true));
-                } else {
-                    expenseTableBody.appendChild(row.cloneNode(true));
-                }
-            });
-
-            // Esconder loading e mostrar tabelas
-            if (allLoading) allLoading.style.display = 'none';
-            if (incomeLoading) incomeLoading.style.display = 'none';
-            if (expenseLoading) expenseLoading.style.display = 'none';
-            if (allTable) allTable.style.display = 'table';
-            if (incomeTable) incomeTable.style.display = 'table';
-            if (expenseTable) expenseTable.style.display = 'table';
+        try {
+            await this.db.collection('transactions').doc(id).delete();
+            
+            this.transactions = this.transactions.filter(t => t.id !== id);
+            
+            this.updateDashboard();
+            this.updateTransactionsTable();
+            this.updateCards();
+            
+            this.showNotification('Transação excluída com sucesso!', 'success');
+        } catch (error) {
+            console.error('Erro ao excluir transação:', error);
+            this.showNotification('Erro ao excluir transação', 'error');
         }
+    }
 
-        // Funções de cartões
-        function openCardModal(cardId = null) {
-            const cardModal = document.getElementById('cardModal');
-            if (cardModal) {
-                cardModal.style.display = 'flex';
+    editTransaction(id) {
+        this.openTransactionModal(id);
+    }
 
-                // Se for uma edição, preencher o formulário com os dados do cartão
-                if (cardId) {
-                    const card = cards.find(c => c.id === cardId);
-                    if (card) {
-                        editingCardId = cardId;
+    // Métodos de Cartões
+    openCardModal(cardId = null) {
+        const modal = document.getElementById('cardModal');
+        if (!modal) return;
 
-                        // Preencher campos do formulário
-                        document.getElementById('cardName').value = card.name;
-                        document.getElementById('cardLimit').value = card.limit;
-                        document.getElementById('cardClosingDay').value = card.closingDay;
-                        document.getElementById('cardDueDate').value = card.dueDate;
+        modal.style.display = 'flex';
+        modal.classList.add('show');
 
-                        // Alterar título do modal
-                        document.querySelector('#cardModal .modal-header h3').textContent = 'Editar Cartão';
-                    }
-                } else {
-                    editingCardId = null;
-                    // Resetar formulário
-                    document.getElementById('cardForm').reset();
-
-                    // Alterar título do modal
-                    document.querySelector('#cardModal .modal-header h3').textContent = 'Adicionar Cartão';
-                }
+        if (cardId) {
+            const card = this.cards.find(c => c.id === cardId);
+            if (card) {
+                this.editingCardId = cardId;
+                this.fillCardForm(card);
+                document.querySelector('#cardModal .modal-title').textContent = 'Editar Cartão';
             }
+        } else {
+            this.editingCardId = null;
+            this.clearCardForm();
+            document.querySelector('#cardModal .modal-title').textContent = 'Adicionar Cartão';
         }
+    }
 
-        function closeCardModalFunc() {
-            const cardModal = document.getElementById('cardModal');
-            const cardForm = document.getElementById('cardForm');
-
-            if (cardModal) {
-                cardModal.style.display = 'none';
-            }
-
-            if (cardForm) {
-                cardForm.reset();
-            }
-
-            // Resetar ID de edição
-            editingCardId = null;
+    closeCardModal() {
+        const modal = document.getElementById('cardModal');
+        if (modal) {
+            modal.style.display = 'none';
+            modal.classList.remove('show');
         }
+        this.clearCardForm();
+        this.editingCardId = null;
+    }
 
-        async function saveCard(e) {
-            e.preventDefault();
+    clearCardForm() {
+        const form = document.getElementById('cardForm');
+        if (form) form.reset();
+    }
 
-            const cardName = document.getElementById('cardName');
-            const cardLimit = document.getElementById('cardLimit');
-            const cardClosingDay = document.getElementById('cardClosingDay');
-            const cardDueDate = document.getElementById('cardDueDate');
+    fillCardForm(card) {
+        document.getElementById('cardName').value = card.name;
+        document.getElementById('cardLimit').value = card.limit;
+        document.getElementById('cardClosingDay').value = card.closingDay;
+        document.getElementById('cardDueDate').value = card.dueDate;
+    }
 
-            if (!cardName || !cardName.value) {
-                showNotification('Informe o nome do cartão.', 'error');
-                return;
-            }
+    async saveCard(e) {
+        e.preventDefault();
 
-            if (!cardLimit || !cardLimit.value) {
-                showNotification('Informe o limite do cartão.', 'error');
-                return;
-            }
-
-            if (!cardClosingDay || !cardClosingDay.value) {
-                showNotification('Informe o dia de fechamento.', 'error');
-                return;
-            }
-
-            if (!cardDueDate || !cardDueDate.value) {
-                showNotification('Informe o dia de vencimento.', 'error');
-                return;
-            }
-
-            const card = {
-                name: cardName.value,
-                limit: parseFloat(cardLimit.value),
-                closingDay: parseInt(cardClosingDay.value),
-                dueDate: parseInt(cardDueDate.value),
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
+        try {
+            const cardData = {
+                name: document.getElementById('cardName').value,
+                limit: parseFloat(document.getElementById('cardLimit').value),
+                closingDay: parseInt(document.getElementById('cardClosingDay').value),
+                dueDate: parseInt(document.getElementById('cardDueDate').value),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             };
 
-            // Se for uma edição, atualizar o cartão existente
-            if (editingCardId) {
-                try {
-                    await updateDoc(doc(db, "cards", editingCardId), card);
-                    
-                    // Atualizar no array local
-                    const index = cards.findIndex(c => c.id === editingCardId);
-                    if (index !== -1) {
-                        cards[index] = { ...cards[index], ...card };
-                    }
-
-                    updateCards();
-                    closeCardModalFunc();
-                    showNotification('Cartão atualizado com sucesso!', 'success');
-                } catch (error) {
-                    console.error("Erro ao atualizar cartão: ", error);
-                    showNotification('Erro ao atualizar cartão. Tente novamente.', 'error');
+            if (this.editingCardId) {
+                await this.db.collection('cards').doc(this.editingCardId).update(cardData);
+                
+                const index = this.cards.findIndex(c => c.id === this.editingCardId);
+                if (index !== -1) {
+                    this.cards[index] = { ...this.cards[index], ...cardData };
                 }
+
+                this.showNotification('Cartão atualizado com sucesso!', 'success');
             } else {
-                // Adicionar cartão ao Firestore
-                try {
-                    const docRef = await addDoc(collection(db, "cards"), card);
-                    
-                    // Adicionar ID gerado pelo Firestore
-                    card.id = docRef.id;
-
-                    // Adicionar ao array local
-                    cards.push(card);
-
-                    updateCards();
-                    closeCardModalFunc();
-                    showNotification('Cartão adicionado com sucesso!', 'success');
-                } catch (error) {
-                    console.error("Erro ao adicionar cartão: ", error);
-                    showNotification('Erro ao adicionar cartão. Tente novamente.', 'error');
-                }
+                const docRef = await this.db.collection('cards').add(cardData);
+                cardData.id = docRef.id;
+                cardData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                
+                this.cards.push(cardData);
+                this.showNotification('Cartão adicionado com sucesso!', 'success');
             }
+
+            this.updateCards();
+            this.populateCardSelects();
+            this.closeCardModal();
+
+        } catch (error) {
+            console.error('Erro ao salvar cartão:', error);
+            this.showNotification('Erro ao salvar cartão', 'error');
         }
+    }
 
-        function updateCards() {
-            const cardsGrid = document.getElementById('cardsGrid');
-            const cardsLoading = document.getElementById('cardsLoading');
+    updateCards() {
+        const cardsGrid = document.getElementById('cardsGrid');
+        const cardsLoading = document.getElementById('cardsLoading');
 
-            if (!cardsGrid || !cardsLoading) {
-                return;
-            }
+        if (!cardsGrid || !cardsLoading) return;
 
-            cardsGrid.innerHTML = '';
+        cardsGrid.innerHTML = '';
 
-            if (cards.length === 0) {
-                cardsGrid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; padding: 2rem;">Nenhum cartão cadastrado</p>';
-
-                // Esconder loading e mostrar grid
-                cardsLoading.style.display = 'none';
-                cardsGrid.style.display = 'grid';
-
-                return;
-            }
-
-            // Calcular o valor total das transações no cartão para o mês atual
-            const currentMonth = new Date().getMonth();
-            const currentYear = new Date().getFullYear();
-
-            cards.forEach(card => {
-                // Calcular o valor das transações no cartão para o mês atual
-                const cardTransactions = transactions.filter(t => {
-                    const transactionDate = new Date(t.date);
-                    return t.cardId === card.id &&
-                        t.type === 'expense' &&
-                        transactionDate.getMonth() === currentMonth &&
-                        transactionDate.getFullYear() === currentYear;
-                });
-
-                const cardSpent = cardTransactions.reduce((sum, t) => sum + t.value, 0);
-                const availableLimit = card.limit - cardSpent;
-                const usagePercentage = cardSpent > 0 ? (cardSpent / card.limit) * 100 : 0;
-                const cardElement = document.createElement('div');
-                cardElement.className = 'credit-card';
-                cardElement.innerHTML = `
-                    <div class="card-header">
-                    <div class="card-name">${card.name}</div>
-                    <div class="card-actions">
-                        <button class="btn-icon btn-editcard" onclick="editCard('${card.id}')">
-                        <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="btn-icon btn-deletecard" onclick="deleteCard('${card.id}')">
-                        <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                    </div>
-                    <div class="card-details">
-                    <div>
-                         <div class="card-limit">Limite disponível</div>
-                            <div class="card-limit-value">${formatCurrency(availableLimit)}</div>
-                        </div>
-                        <div>
-                            <div class="card-limit">Fatura atual</div>
-                            <div class="card-limit-value">${formatCurrency(cardSpent)}</div>
-                        </div>
-                    </div>
-                    <div class="progress-bar">
-                    <div class="progress" style="width: ${usagePercentage}%"></div>
-                    </div>
-                    <div class="card-limit">Limite: ${formatCurrency(card.limit)} <br> Melhor dia: ${card.closingDay} <br> Vencimento: ${card.dueDate}</div> `;
-
-                cardsGrid.appendChild(cardElement);
-            });
-
-            // Esconder loading e mostrar grid
+        if (this.cards.length === 0) {
+            cardsGrid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; padding: 2rem;">Nenhum cartão cadastrado</p>';
             cardsLoading.style.display = 'none';
             cardsGrid.style.display = 'grid';
+            return;
         }
 
-        // Funções de usuários
-        function openUserModal(userId = null) {
-            const userModal = document.getElementById('userModal');
-            if (userModal) {
-                userModal.style.display = 'flex';
+        const currentMonth = new Date().getMonth();
+        const currentYear = new Date().getFullYear();
 
-                // Se for uma edição, preencher o formulário com os dados do usuário
-                if (userId) {
-                    const user = users.find(u => u.id === userId);
-                    if (user) {
-                        editingUserId = userId;
+        this.cards.forEach(card => {
+            const cardTransactions = this.transactions.filter(t => {
+                const transactionDate = new Date(t.date);
+                return t.cardId === card.id &&
+                    t.type === 'expense' &&
+                    transactionDate.getMonth() === currentMonth &&
+                    transactionDate.getFullYear() === currentYear;
+            });
 
-                        // Preencher campos do formulário
-                        document.getElementById('userName').value = user.name;
-                        document.getElementById('userEmail').value = user.email || '';
-                        document.getElementById('userAvatar').value = user.avatar;
+            const cardSpent = cardTransactions.reduce((sum, t) => sum + t.value, 0);
+            const availableLimit = card.limit - cardSpent;
+            const usagePercentage = card.limit > 0 ? (cardSpent / card.limit) * 100 : 0;
 
-                        // Alterar título do modal
-                        document.querySelector('#userModal .modal-header h3').textContent = 'Editar Usuário';
-                    }
-                } else {
-                    editingUserId = null;
-                    // Resetar formulário
-                    document.getElementById('userForm').reset();
-
-                    // Alterar título do modal
-                    document.querySelector('#userModal .modal-header h3').textContent = 'Adicionar Usuário';
-                }
-            }
-        }
-
-        function closeUserModalFunc() {
-            const userModal = document.getElementById('userModal');
-            const userForm = document.getElementById('userForm');
-
-            if (userModal) {
-                userModal.style.display = 'none';
-            }
-
-            if (userForm) {
-                userForm.reset();
-            }
-
-            // Resetar ID de edição
-            editingUserId = null;
-        }
-
-        async function saveUser(e) {
-            e.preventDefault();
-
-            const userName = document.getElementById('userName');
-            const userEmail = document.getElementById('userEmail');
-            const userAvatar = document.getElementById('userAvatar');
-
-            if (!userName || !userName.value) {
-                showNotification('Informe o nome do usuário.', 'error');
-                return;
-            }
-
-            if (!userAvatar || !userAvatar.value) {
-                showNotification('Informe as iniciais do nome.', 'error');
-                return;
-            }
-
-            const user = {
-                name: userName.value,
-                email: userEmail && userEmail.value ? userEmail.value : '',
-                avatar: userAvatar.value.toUpperCase(),
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
-            };
-
-            // Se for uma edição, atualizar o usuário existente
-            if (editingUserId) {
-                try {
-                    await updateDoc(doc(db, "users", editingUserId), user);
-                    
-                    // Atualizar no array local
-                    const index = users.findIndex(u => u.id === editingUserId);
-                    if (index !== -1) {
-                        users[index] = { ...users[index], ...user };
-                    }
-
-                    // Atualizar o seletor de usuário no cabeçalho
-                    updateUserSelector();
-
-                    updateUsers();
-                    closeUserModalFunc();
-                    showNotification('Usuário atualizado com sucesso!', 'success');
-                } catch (error) {
-                    console.error("Erro ao atualizar usuário: ", error);
-                    showNotification('Erro ao atualizar usuário. Tente novamente.', 'error');
-                }
-            } else {
-                // Adicionar usuário ao Firestore
-                try {
-                    const docRef = await addDoc(collection(db, "users"), user);
-                    
-                    // Adicionar ID gerado pelo Firestore
-                    user.id = docRef.id;
-
-                    // Adicionar ao array local
-                    users.push(user);
-
-                    // Atualizar o seletor de usuário no cabeçalho
-                    updateUserSelector();
-
-                    updateUsers();
-                    closeUserModalFunc();
-                    showNotification('Usuário adicionado com sucesso!', 'success');
-                } catch (error) {
-                    console.error("Erro ao adicionar usuário: ", error);
-                    showNotification('Erro ao adicionar usuário. Tente novamente.', 'error');
-                }
-            }
-        }
-
-        function updateUserSelector() {
-            const userSelector = document.getElementById('userSelector');
-
-            if (!userSelector) return;
-
-            // Limpar opções existentes
-            userSelector.innerHTML = '';
-
-            // Adicionar usuários
-            if (users && users.length > 0) {
-                users.forEach(user => {
-                    const option = document.createElement('option');
-                    option.value = user.id;
-                    option.textContent = user.name;
-                    userSelector.appendChild(option);
-                });
-            }
-        }
-
-        function updateUsers() {
-            const usersGrid = document.getElementById('usersGrid');
-            const usersLoading = document.getElementById('usersLoading');
-
-            if (!usersGrid || !usersLoading) {
-                return;
-            }
-
-            usersGrid.innerHTML = '';
-
-            if (users.length === 0) {
-                usersGrid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; padding: 2rem;">Nenhum usuário cadastrado</p>';
-
-                // Esconder loading e mostrar grid
-                usersLoading.style.display = 'none';
-                usersGrid.style.display = 'grid';
-
-                return;
-            }
-
-            users.forEach(user => {
-                const userElement = document.createElement('div');
-                userElement.className = 'user-card';
-                userElement.innerHTML = `
-                    <div class="user-card-header">
-                        <div class="user-avatar">${user.avatar}</div>
-                        <div class="user-card-name">${user.name}</div>
-                    </div>
-                    <div class="card-description">${user.email || 'E-mail não informado'}</div>
+            const cardElement = document.createElement('div');
+            cardElement.className = 'credit-card';
+            cardElement.innerHTML = `
+                <div class="card-header">
+                    <div class="card-name">${card.name}</div>
                     <div class="card-actions">
-                        <button class="btn-icon btn-edituser" onclick="editUser('${user.id}')">
+                        <button class="btn-icon btn-edit" onclick="app.editCard('${card.id}')" title="Editar">
                             <i class="fas fa-edit"></i>
                         </button>
-                        <button class="btn-icon btn-deleteuser" onclick="deleteUser('${user.id}')">
+                        <button class="btn-icon btn-delete" onclick="app.deleteCard('${card.id}')" title="Excluir">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>
-                `;
+                </div>
+                <div class="card-details">
+                    <div>
+                        <div class="card-limit">Limite disponível</div>
+                        <div class="card-limit-value">${this.formatCurrency(availableLimit)}</div>
+                    </div>
+                    <div>
+                        <div class="card-limit">Fatura atual</div>
+                        <div class="card-limit-value">${this.formatCurrency(cardSpent)}</div>
+                    </div>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress" style="width: ${usagePercentage}%"></div>
+                </div>
+                <div class="card-limit">
+                    Limite: ${this.formatCurrency(card.limit)}<br>
+                    Fechamento: ${card.closingDay}º<br>
+                    Vencimento: ${card.dueDate}º
+                </div>
+            `;
 
-                usersGrid.appendChild(userElement);
-            });
+            cardsGrid.appendChild(cardElement);
+        });
 
-            // Esconder loading e mostrar grid
+        cardsLoading.style.display = 'none';
+        cardsGrid.style.display = 'grid';
+    }
+
+    async deleteCard(id) {
+        if (!confirm('Tem certeza que deseja excluir este cartão?')) return;
+
+        try {
+            await this.db.collection('cards').doc(id).delete();
+            
+            this.cards = this.cards.filter(c => c.id !== id);
+            
+            this.updateCards();
+            this.populateCardSelects();
+            
+            this.showNotification('Cartão excluído com sucesso!', 'success');
+        } catch (error) {
+            console.error('Erro ao excluir cartão:', error);
+            this.showNotification('Erro ao excluir cartão', 'error');
+        }
+    }
+
+    editCard(id) {
+        this.openCardModal(id);
+    }
+
+    // Métodos de Usuários
+    openUserModal(userId = null) {
+        const modal = document.getElementById('userModal');
+        if (!modal) return;
+
+        modal.style.display = 'flex';
+        modal.classList.add('show');
+
+        if (userId) {
+            const user = this.users.find(u => u.id === userId);
+            if (user) {
+                this.editingUserId = userId;
+                this.fillUserForm(user);
+                document.querySelector('#userModal .modal-title').textContent = 'Editar Usuário';
+            }
+        } else {
+            this.editingUserId = null;
+            this.clearUserForm();
+            document.querySelector('#userModal .modal-title').textContent = 'Adicionar Usuário';
+        }
+    }
+
+    closeUserModal() {
+        const modal = document.getElementById('userModal');
+        if (modal) {
+            modal.style.display = 'none';
+            modal.classList.remove('show');
+        }
+        this.clearUserForm();
+        this.editingUserId = null;
+    }
+
+    clearUserForm() {
+        const form = document.getElementById('userForm');
+        if (form) form.reset();
+    }
+
+    fillUserForm(user) {
+        document.getElementById('userName').value = user.name;
+        document.getElementById('userEmail').value = user.email || '';
+        document.getElementById('usuario').value = user.avatar || '';
+    }
+
+    async saveUser(e) {
+        e.preventDefault();
+
+        try {
+            const userData = {
+                name: document.getElementById('userName').value,
+                email: document.getElementById('userEmail').value || '',
+                avatar: document.getElementById('usuario').value.toUpperCase() || document.getElementById('userName').value.charAt(0).toUpperCase(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            if (this.editingUserId) {
+                await this.db.collection('users').doc(this.editingUserId).update(userData);
+                
+                const index = this.users.findIndex(u => u.id === this.editingUserId);
+                if (index !== -1) {
+                    this.users[index] = { ...this.users[index], ...userData };
+                }
+
+                this.showNotification('Usuário atualizado com sucesso!', 'success');
+            } else {
+                const docRef = await this.db.collection('users').add(userData);
+                userData.id = docRef.id;
+                userData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                
+                this.users.push(userData);
+                this.showNotification('Usuário adicionado com sucesso!', 'success');
+            }
+
+            this.updateUsers();
+            this.populateUserSelector();
+            this.populateCardUserSelect();
+            this.closeUserModal();
+
+        } catch (error) {
+            console.error('Erro ao salvar usuário:', error);
+            this.showNotification('Erro ao salvar usuário', 'error');
+        }
+    }
+
+    updateUsers() {
+        const usersGrid = document.getElementById('usersGrid');
+        const usersLoading = document.getElementById('usersLoading');
+
+        if (!usersGrid || !usersLoading) return;
+
+        usersGrid.innerHTML = '';
+
+        if (this.users.length === 0) {
+            usersGrid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; padding: 2rem;">Nenhum usuário cadastrado</p>';
             usersLoading.style.display = 'none';
             usersGrid.style.display = 'grid';
+            return;
         }
 
-        // Funções de relatório de fatura
-        function openInvoiceReportModal() {
-            const invoiceReportModal = document.getElementById('invoiceReportModal');
-            const reportCard = document.getElementById('reportCard');
-            const reportYear = document.getElementById('reportYear');
-
-            if (!invoiceReportModal || !reportCard || !reportYear) {
-                return;
-            }
-
-            // Preencher o select de cartões
-            reportCard.innerHTML = '<option value="">Selecione um cartão</option>';
-            if (cards && cards.length > 0) {
-                cards.forEach(card => {
-                    const option = document.createElement('option');
-                    option.value = card.id;
-                    option.textContent = card.name;
-                    reportCard.appendChild(option);
-                });
-            }
-
-            // Preencher o select de anos
-            const currentYear = new Date().getFullYear();
-            reportYear.innerHTML = '';
-            for (let year = currentYear - 2; year <= currentYear + 2; year++) {
-                const option = document.createElement('option');
-                option.value = year;
-                option.textContent = year;
-                if (year === currentYear) {
-                    option.selected = true;
-                }
-                reportYear.appendChild(option);
-            }
-
-            // Definir o mês atual
-            const reportMonth = document.getElementById('reportMonth');
-            if (reportMonth) {
-                reportMonth.value = new Date().getMonth();
-            }
-
-            invoiceReportModal.style.display = 'flex';
-        }
-
-        function closeInvoiceReportModalFunc() {
-            const invoiceReportModal = document.getElementById('invoiceReportModal');
-            const invoiceReportContent = document.getElementById('invoiceReportContent');
-
-            if (invoiceReportModal) {
-                invoiceReportModal.style.display = 'none';
-            }
-
-            if (invoiceReportContent) {
-                invoiceReportContent.style.display = 'none';
-                invoiceReportContent.innerHTML = '';
-            }
-        }
-
-        function generateInvoiceReportFunc() {
-            const reportCard = document.getElementById('reportCard');
-            const reportMonth = document.getElementById('reportMonth');
-            const reportYear = document.getElementById('reportYear');
-            const invoiceReportContent = document.getElementById('invoiceReportContent');
-
-            if (!reportCard || !reportMonth || !reportYear || !invoiceReportContent) {
-                return;
-            }
-
-            const cardId = reportCard.value;
-            const month = parseInt(reportMonth.value);
-            const year = parseInt(reportYear.value);
-
-            if (!cardId) {
-                showNotification('Selecione um cartão para gerar o relatório.', 'error');
-                return;
-            }
-
-            // Encontrar o cartão
-            const card = cards.find(c => c.id === cardId);
-            if (!card) {
-                showNotification('Cartão não encontrado.', 'error');
-                return;
-            }
-
-            // Filtrar transações do cartão no mês/ano selecionado
-            const cardTransactions = transactions.filter(t => {
-                const transactionDate = new Date(t.date);
-                return t.cardId === cardId &&
-                    transactionDate.getMonth() === month &&
-                    transactionDate.getFullYear() === year;
-            });
-
-            // Agrupar transações por usuário
-            const userTransactions = {};
-            let totalAmount = 0;
-
-            cardTransactions.forEach(transaction => {
-                const userId = transaction.cardUserId || transaction.user;
-
-                if (!userTransactions[userId]) {
-                    userTransactions[userId] = {
-                        user: getUserName(userId),
-                        transactions: [],
-                        total: 0
-                    };
-                }
-
-                userTransactions[userId].transactions.push(transaction);
-                userTransactions[userId].total += transaction.value;
-                totalAmount += transaction.value;
-            });
-
-            // Gerar HTML do relatório
-            let reportHTML = `
-                <h4>Fatura do cartão ${card.name} - ${getMonthName(month)} de ${year}</h4>
-                <table class="invoice-report-table">
-                    <thead>
-                        <tr>
-                            <th>Descrição</th>
-                            <th>Data</th>
-                            <th>Valor</th>
-                            <th>Parcelas</th>
-                            <th>Usuário</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-
-            // Adicionar transações
-            cardTransactions.forEach(transaction => {
-                const userText = getUserName(transaction.cardUserId || transaction.user);
-                let installmentText = '-';
-
-                if (transaction.installment) {
-                    installmentText = `Parcela ${transaction.installment.description}`;
-                }
-
-                reportHTML += `
-                    <tr>
-                        <td>${transaction.description}</td>
-                        <td>${formatDate(transaction.date)}</td>
-                        <td>${formatCurrency(transaction.value)}</td>
-                        <td>${installmentText}</td>
-                        <td>${userText}</td>
-                    </tr>
-                `;
-            });
-
-            reportHTML += `
-                    </tbody>
-                    <tfoot>
-                        <tr class="invoice-report-total">
-                            <td colspan="2"><strong>Total</strong></td>
-                            <td><strong>${formatCurrency(totalAmount)}</strong></td>
-                            <td colspan="2"></td>
-                        </tr>
-                    </tfoot>
-                </table>
-                
-                <h5>Resumo por usuário</h5>
-                <table class="invoice-report-table">
-                    <thead>
-                        <tr>
-                            <th>Usuário</th>
-                            <th>Valor a pagar</th>
-                            <th>Percentual</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-
-            // Adicionar resumo por usuário
-            Object.keys(userTransactions).forEach(userId => {
-                const userTransaction = userTransactions[userId];
-                const percentage = totalAmount > 0 ? (userTransaction.total / totalAmount * 100).toFixed(2) : 0;
-
-                reportHTML += `
-                    <tr>
-                        <td>${userTransaction.user}</td>
-                        <td>${formatCurrency(userTransaction.total)}</td>
-                        <td>${percentage}%</td>
-                    </tr>
-                `;
-            });
-
-            reportHTML += `
-                    </tbody>
-                </table>
-                
-                <div style="margin-top: 20px; text-align: right;">
-                    <button class="btn btn-success" id="printReportBtn">
-                        <i class="fas fa-print"></i> Imprimir
+        this.users.forEach(user => {
+            const userElement = document.createElement('div');
+            userElement.className = 'user-card';
+            userElement.innerHTML = `
+                <div class="user-card-header">
+                    <div class="user-avatar">${user.avatar}</div>
+                    <div class="user-card-name">${user.name}</div>
+                </div>
+                <div class="card-description">${user.email || 'E-mail não informado'}</div>
+                <div class="card-actions">
+                    <button class="btn-icon btn-edit" onclick="app.editUser('${user.id}')" title="Editar">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn-icon btn-delete" onclick="app.deleteUser('${user.id}')" title="Excluir">
+                        <i class="fas fa-trash"></i>
                     </button>
                 </div>
             `;
 
-            // Exibir o relatório
-            invoiceReportContent.innerHTML = reportHTML;
-            invoiceReportContent.style.display = 'block';
+            usersGrid.appendChild(userElement);
+        });
 
-            // Adicionar evento ao botão de impressão
-            const printReportBtn = document.getElementById('printReportBtn');
-            if (printReportBtn) {
-                printReportBtn.addEventListener('click', function () {
-                    window.print();
-                });
-            }
-        }
-
-        function getMonthName(monthIndex) {
-            const months = [
-                'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-                'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-            ];
-            return months[monthIndex];
-        }
-
-        // Funções de abas
-        function openTab(tabId) {
-            const tabs = document.querySelectorAll('.tab');
-            const tabContents = document.querySelectorAll('.tab-content');
-
-            if (!tabs || !tabContents) {
-                return;
-            }
-
-            tabs.forEach(tab => {
-                if (tab.getAttribute('data-tab') === tabId) {
-                    tab.classList.add('active');
-                } else {
-                    tab.classList.remove('active');
-                }
-            });
-
-            tabContents.forEach(content => {
-                if (content.id === `${tabId}-tab`) {
-                    content.classList.add('active');
-                } else {
-                    content.classList.remove('active');
-                }
-            });
-        }
-
-        // Funções utilitárias
-        function formatCurrency(value) {
-            return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-        }
-
-        function formatDate(dateString) {
-            const date = new Date(dateString);
-            return date.toLocaleDateString('pt-BR');
-        }
-
-        function getCategoryName(category) {
-            const categories = {
-                'food': 'Alimentação',
-                'transport': 'Transporte',
-                'shopping': 'Compras',
-                'bills': 'Contas',
-                'entertainment': 'Entretenimento',
-                'health': 'Saúde',
-                'education': 'Educação',
-                'salary': 'Salário',
-                'investments': 'Investimentos',
-                'other': 'Outros'
-            };
-
-            return categories[category] || category;
-        }
-
-        function showNotification(message, type = 'success') {
-            const notification = document.getElementById('notification');
-            const notificationMessage = document.getElementById('notificationMessage');
-
-            if (!notification || !notificationMessage) {
-                return;
-            }
-
-            notificationMessage.textContent = message;
-            notification.className = `notification ${type}`;
-            notification.classList.add('show');
-
-            setTimeout(() => {
-                notification.classList.remove('show');
-            }, 3000);
-        }
-
-        // Funções do Firebase
-        async function loadFromFirebase() {
-            try {
-                console.log("📊 Carregando dados do Firebase...");
-                
-                // Carregar transações
-                const transactionsQuery = query(collection(db, "transactions"), orderBy("createdAt", "desc"));
-                const transactionsSnapshot = await getDocs(transactionsQuery);
-                transactions = [];
-                transactionsSnapshot.forEach((doc) => {
-                    const transaction = doc.data();
-                    transaction.id = doc.id;
-                    transactions.push(transaction);
-                });
-
-                // Carregar cartões
-                const cardsSnapshot = await getDocs(collection(db, "cards"));
-                cards = [];
-                cardsSnapshot.forEach((doc) => {
-                    const card = doc.data();
-                    card.id = doc.id;
-                    cards.push(card);
-                });
-
-                // Carregar usuários
-                const usersSnapshot = await getDocs(collection(db, "users"));
-                users = [];
-                usersSnapshot.forEach((doc) => {
-                    const user = doc.data();
-                    user.id = doc.id;
-                    users.push(user);
-                });
-
-                // Se não houver usuários, adicionar usuários padrão
-                if (users.length === 0) {
-                    const defaultUsers = [
-                        { name: 'Noldenval', avatar: 'N', email: 'noldenval@example.com', admin: false, ativo: true, senha: '', tipo: 'padrao' },
-                        { name: 'Eliane', avatar: 'E', email: 'eliane@example.com', admin: false, ativo: true, senha: '', tipo: 'padrao' },
-                        { name: 'Convidado', avatar: 'C', email: 'convidado@example.com', admin: false, ativo: true, senha: '', tipo: 'convidado' }
-                    ];
-
-                    const promises = defaultUsers.map(user => 
-                        addDoc(collection(db, "users"), user)
-                    );
-
-                    const docRefs = await Promise.all(promises);
-                    
-                    // Adicionar os usuários ao array local com os IDs gerados
-                    docRefs.forEach((docRef, index) => {
-                        const userWithId = { ...defaultUsers[index], id: docRef.id };
-                        users.push(userWithId);
-                    });
-                }
-
-                // Atualizar o seletor de usuário no cabeçalho
-                updateUserSelector();
-
-                // Atualizar interface
-                updateDashboard();
-                updateTransactionsTable();
-                updateCards();
-                updateUsers();
-                
-                console.log("✅ Dados carregados com sucesso!");
-            } catch (error) {
-                console.error("Erro ao carregar dados do Firebase: ", error);
-                showNotification('Erro ao carregar dados. Tente novamente.', 'error');
-                throw error;
-            }
-        }
-
-        // Funções de edição e exclusão globais para serem chamadas pelos botões
-        window.editTransaction = function (transactionId) {
-            openTransactionModal(transactionId);
-        };
-
-        window.editCard = function (cardId) {
-            openCardModal(cardId);
-        };
-
-        window.editUser = function (userId) {
-            openUserModal(userId);
-        };
-
-        window.deleteTransaction = async function (transactionId) {
-            if (confirm('Tem certeza que deseja excluir esta transação?')) {
-                try {
-                    // Verificar se é uma transação parcelada
-                    const transaction = transactions.find(t => t.id === transactionId);
-                    if (transaction) {
-                        const parentTransactionId = transaction.parentTransactionId || transactionId;
-
-                        // Encontrar todas as parcelas relacionadas
-                        const relatedTransactions = transactions.filter(t =>
-                            t.id === parentTransactionId || t.parentTransactionId === parentTransactionId
-                        );
-
-                        // Excluir todas as parcelas
-                        const deletePromises = relatedTransactions.map(t =>
-                            deleteDoc(doc(db, "transactions", t.id))
-                        );
-
-                        await Promise.all(deletePromises);
-                        
-                        // Remover do array local
-                        transactions = transactions.filter(t =>
-                            !relatedTransactions.some(rt => rt.id === t.id)
-                        );
-
-                        updateDashboard();
-                        updateTransactionsTable();
-                        updateCards();
-                        showNotification('Transação excluída com sucesso!', 'success');
-                    }
-                } catch (error) {
-                    console.error("Erro ao excluir transação: ", error);
-                    showNotification('Erro ao excluir transação. Tente novamente.', 'error');
-                }
-            }
-        };
-
-        window.deleteCard = async function (cardId) {
-            if (confirm('Tem certeza que deseja excluir este cartão? Todas as transações associadas também serão excluídas.')) {
-                try {
-                    // Verificar se existem transações associadas a este cartão
-                    const cardTransactions = transactions.filter(t => t.cardId === cardId);
-
-                    if (cardTransactions.length > 0) {
-                        // Excluir todas as transações associadas
-                        const deleteTransactionPromises = cardTransactions.map(t =>
-                            deleteDoc(doc(db, "transactions", t.id))
-                        );
-
-                        await Promise.all(deleteTransactionPromises);
-                        
-                        // Excluir o cartão
-                        await deleteDoc(doc(db, "cards", cardId));
-                        
-                        // Remover do array local
-                        cards = cards.filter(c => c.id !== cardId);
-                        transactions = transactions.filter(t => t.cardId !== cardId);
-
-                        updateDashboard();
-                        updateTransactionsTable();
-                        updateCards();
-                        showNotification('Cartão e transações associadas excluídos com sucesso!', 'success');
-                    } else {
-                        // Excluir apenas o cartão
-                        await deleteDoc(doc(db, "cards", cardId));
-                        
-                        // Remover do array local
-                        cards = cards.filter(c => c.id !== cardId);
-
-                        updateCards();
-                        showNotification('Cartão excluído com sucesso!', 'success');
-                    }
-                } catch (error) {
-                    console.error("Erro ao excluir cartão: ", error);
-                    showNotification('Erro ao excluir cartão. Tente novamente.', 'error');
-                }
-            }
-        };
-
-        window.deleteUser = async function (userId) {
-            if (confirm('Tem certeza que deseja excluir este usuário?')) {
-                try {
-                    await deleteDoc(doc(db, "users", userId));
-                    
-                    // Remover do array local
-                    users = users.filter(u => u.id !== userId);
-
-                    // Atualizar o seletor de usuário no cabeçalho
-                    updateUserSelector();
-
-                    updateUsers();
-                    showNotification('Usuário excluído com sucesso!', 'success');
-                } catch (error) {
-                    console.error("Erro ao excluir usuário: ", error);
-                    showNotification('Erro ao excluir usuário. Tente novamente.', 'error');
-                }
-            }
-        };
-        
-        // Funções de carregamento e tratamento de erros
-        function showLoading() {
-            const loadingMessage = document.getElementById('loading-message');
-            if (loadingMessage) {
-                loadingMessage.style.display = 'flex';
-            }
-            
-            document.querySelectorAll('.card-loading').forEach(el => {
-                el.style.display = 'flex';
-            });
-        }
-
-        function hideLoading() {
-            const loadingMessage = document.getElementById('loading-message');
-            if (loadingMessage) {
-                loadingMessage.style.display = 'none';
-            }
-            
-            document.querySelectorAll('.card-loading').forEach(el => {
-                el.style.display = 'none';
-            });
-        }
-
-        function showError(message) {
-            const errorElement = document.getElementById('error-message');
-            if (errorElement) {
-                errorElement.querySelector('p').innerHTML = `⚠️ ${message}. <a href="#" id="retry-btn">Tentar novamente</a>`;
-                errorElement.style.display = 'flex';
-                
-                const retryBtn = document.getElementById('retry-btn');
-                if (retryBtn) {
-                    retryBtn.addEventListener('click', async (e) => {
-                        e.preventDefault();
-                        errorElement.style.display = 'none';
-                        showLoading();
-                        try {
-                            await loadFromFirebase();
-                        } catch (error) {
-                            showError('Erro ao recarregar os dados');
-                        } finally {
-                            hideLoading();
-                        }
-                    });
-                }
-            }
-        }
-
-    } catch (error) {
-        showError('Erro ao carregar dados do dashboard');
-        console.error('Erro geral:', error);
-        hideLoading();
+        usersLoading.style.display = 'none';
+        usersGrid.style.display = 'grid';
     }
+
+    async deleteUser(id) {
+        if (!confirm('Tem certeza que deseja excluir este usuário?')) return;
+
+        try {
+            await this.db.collection('users').doc(id).delete();
+            
+            this.users = this.users.filter(u => u.id !== id);
+            
+            this.updateUsers();
+            this.populateUserSelector();
+            this.populateCardUserSelect();
+            
+            this.showNotification('Usuário excluído com sucesso!', 'success');
+        } catch (error) {
+            console.error('Erro ao excluir usuário:', error);
+            this.showNotification('Erro ao excluir usuário', 'error');
+        }
+    }
+
+    editUser(id) {
+        this.openUserModal(id);
+    }
+
+    // Métodos de Relatório
+    openInvoiceReportModal() {
+        const modal = document.getElementById('invoiceReportModal');
+        if (modal) {
+            modal.style.display = 'flex';
+            modal.classList.add('show');
+            this.populateReportCardSelect();
+        }
+    }
+
+    closeInvoiceReportModal() {
+        const modal = document.getElementById('invoiceReportModal');
+        if (modal) {
+            modal.style.display = 'none';
+            modal.classList.remove('show');
+        }
+    }
+
+    populateReportYears() {
+        const yearSelect = document.getElementById('reportYear');
+        if (!yearSelect) return;
+
+        const currentYear = new Date().getFullYear();
+        yearSelect.innerHTML = '';
+
+        for (let year = currentYear - 5; year <= currentYear + 5; year++) {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = year;
+            if (year === currentYear) option.selected = true;
+            yearSelect.appendChild(option);
+        }
+    }
+
+    populateReportCardSelect() {
+        const cardSelect = document.getElementById('reportCard');
+        if (!cardSelect) return;
+
+        cardSelect.innerHTML = '<option value="">Selecione um cartão</option>';
+
+        this.cards.forEach(card => {
+            const option = document.createElement('option');
+            option.value = card.id;
+            option.textContent = card.name;
+            cardSelect.appendChild(option);
+        });
+    }
+
+    generateInvoiceReport() {
+        const cardId = document.getElementById('reportCard').value;
+        const month = parseInt(document.getElementById('reportMonth').value);
+        const year = parseInt(document.getElementById('reportYear').value);
+
+        if (!cardId) {
+            this.showNotification('Selecione um cartão', 'error');
+            return;
+        }
+
+        const card = this.cards.find(c => c.id === cardId);
+        if (!card) return;
+
+        // Filtrar transações do cartão no período
+        const cardTransactions = this.transactions.filter(t => {
+            const transactionDate = new Date(t.date);
+            return t.cardId === cardId &&
+                t.type === 'expense' &&
+                transactionDate.getMonth() === month &&
+                transactionDate.getFullYear() === year;
+        });
+
+        const totalAmount = cardTransactions.reduce((sum, t) => sum + t.value, 0);
+
+        // Gerar conteúdo do relatório
+        const reportContent = document.getElementById('invoiceReportContent');
+        const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+        reportContent.innerHTML = `
+            <div class="invoice-report">
+                <h4>Relatório de Fatura - ${card.name}</h4>
+                <p><strong>Período:</strong> ${monthNames[month]} de ${year}</p>
+                <p><strong>Total da Fatura:</strong> ${this.formatCurrency(totalAmount)}</p>
+                <p><strong>Quantidade de Transações:</strong> ${cardTransactions.length}</p>
+                
+                <h5>Transações Detalhadas</h5>
+                <table class="invoice-table">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Descrição</th>
+                            <th>Categoria</th>
+                            <th>Valor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${cardTransactions.map(t => `
+                            <tr>
+                                <td>${this.formatDate(t.date)}</td>
+                                <td>${t.description}</td>
+                                <td>${this.getCategoryName(t.category)}</td>
+                                <td>${this.formatCurrency(t.value)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                
+                <div class="report-actions">
+                    <button class="btn btn-primary" onclick="app.printReport()">
+                        <i class="fas fa-print"></i> Imprimir
+                    </button>
+                    <button class="btn btn-secondary" onclick="app.exportReport()">
+                        <i class="fas fa-download"></i> Exportar
+                    </button>
+                </div>
+            </div>
+        `;
+
+        reportContent.style.display = 'block';
+    }
+
+    printReport() {
+        window.print();
+    }
+
+    exportReport() {
+        // Simulação de exportação
+        this.showNotification('Função de exportação em desenvolvimento', 'info');
+    }
+
+    // Métodos de UI
+    openTab(tabId) {
+        // Esconder todos os conteúdos de abas
+        const tabContents = document.querySelectorAll('.tab-content');
+        tabContents.forEach(content => {
+            content.classList.remove('active');
+        });
+
+        // Remover classe active de todas as abas
+        const tabs = document.querySelectorAll('.tab');
+        tabs.forEach(tab => {
+            tab.classList.remove('active');
+        });
+
+        // Mostrar conteúdo da aba selecionada
+        const selectedTab = document.getElementById(`${tabId}-tab`);
+        if (selectedTab) {
+            selectedTab.classList.add('active');
+        }
+
+        // Adicionar classe active à aba clicada
+        const clickedTab = document.querySelector(`[data-tab="${tabId}"]`);
+        if (clickedTab) {
+            clickedTab.classList.add('active');
+        }
+    }
+
+    changeUser(e) {
+        this.currentUser = e.target.value;
+        this.updateUserAvatar();
+        this.updateDashboard();
+        this.updateTransactionsTable();
+    }
+
+    updateUserAvatar() {
+        const userAvatar = document.getElementById('userAvatar');
+        const userSelector = document.getElementById('userSelector');
+        
+        if (userAvatar && userSelector) {
+            const selectedOption = userSelector.options[userSelector.selectedIndex];
+            userAvatar.textContent = selectedOption.text.charAt(0).toUpperCase();
+        }
+    }
+
+    populateUserSelector() {
+        const userSelector = document.getElementById('userSelector');
+        if (!userSelector) return;
+
+        userSelector.innerHTML = '';
+
+        this.users.forEach(user => {
+            const option = document.createElement('option');
+            option.value = user.id;
+            option.textContent = user.name;
+            if (user.id === this.currentUser) option.selected = true;
+            userSelector.appendChild(option);
+        });
+    }
+
+    populateCardSelects() {
+        this.populateCardSelect();
+        this.populateCardUserSelect();
+    }
+
+    populateCardSelect() {
+        const cardSelect = document.getElementById('transactionCard');
+        if (!cardSelect) return;
+
+        cardSelect.innerHTML = '<option value="">Selecione um cartão</option>';
+
+        this.cards.forEach(card => {
+            const option = document.createElement('option');
+            option.value = card.id;
+            option.textContent = card.name;
+            cardSelect.appendChild(option);
+        });
+    }
+
+    populateCardUserSelect() {
+        const userSelect = document.getElementById('transactionCardUser');
+        if (!userSelect) return;
+
+        userSelect.innerHTML = '<option value="">Selecione um usuário</option>';
+
+        this.users.forEach(user => {
+            const option = document.createElement('option');
+            option.value = user.id;
+            option.textContent = user.name;
+            userSelect.appendChild(option);
+        });
+    }
+
+    hideLoading(type) {
+        const loading = document.getElementById(`${type}Loading`);
+        const table = document.getElementById(`${type}Table`);
+        
+        if (loading) loading.style.display = 'none';
+        if (table) table.style.display = 'table';
+    }
+
+    // Métodos utilitários
+    formatCurrency(value) {
+        return new Intl.NumberFormat('pt-BR', {
+            style: 'currency',
+            currency: 'BRL'
+        }).format(value);
+    }
+
+    formatDate(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('pt-BR');
+    }
+
+    getCategoryName(category) {
+        const categories = {
+            food: 'Alimentação',
+            transport: 'Transporte',
+            shopping: 'Compras',
+            bills: 'Contas',
+            entertainment: 'Entretenimento',
+            health: 'Saúde',
+            education: 'Educação',
+            salary: 'Salário',
+            investments: 'Investimentos',
+            other: 'Outros'
+        };
+        return categories[category] || category;
+    }
+
+    getUserName(userId) {
+        const user = this.users.find(u => u.id === userId);
+        return user ? user.name : 'Usuário';
+    }
+
+    showNotification(message, type = 'success') {
+        // Remover notificação existente
+        const existingNotification = document.querySelector('.notification');
+        if (existingNotification) {
+            existingNotification.remove();
+        }
+
+        // Criar nova notificação
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        
+        const icon = type === 'success' ? 'check-circle' : 
+                     type === 'error' ? 'exclamation-circle' : 
+                     type === 'warning' ? 'exclamation-triangle' : 'info-circle';
+        
+        notification.innerHTML = `
+            <i class="fas fa-${icon}"></i>
+            <span>${message}</span>
+        `;
+
+        document.body.appendChild(notification);
+
+        // Mostrar notificação
+        setTimeout(() => notification.classList.add('show'), 100);
+
+        // Esconder após 3 segundos
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => notification.remove(), 300);
+        }, 3000);
+    }
+}
+
+// Inicializar aplicativo quando o DOM estiver carregado
+document.addEventListener('DOMContentLoaded', () => {
+    window.app = new FinanFacil();
 });
+
+// Funções globais para os botões
+window.editTransaction = function(id) {
+    window.app.editTransaction(id);
+};
+
+window.deleteTransaction = function(id) {
+    window.app.deleteTransaction(id);
+};
+
+window.editCard = function(id) {
+    window.app.editCard(id);
+};
+
+window.deleteCard = function(id) {
+    window.app.deleteCard(id);
+};
+
+window.editUser = function(id) {
+    window.app.editUser(id);
+};
+
+window.deleteUser = function(id) {
+    window.app.deleteUser(id);
+};
+
+window.printReport = function() {
+    window.app.printReport();
+};
+
+window.exportReport = function() {
+    window.app.exportReport();
+};
