@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (typeof db === 'undefined') {
             console.error('Firebase não foi carregado. Verifique a conexão com a internet.');
             showNotification('Erro ao carregar o Firebase. Verifique sua conexão.', 'error');
+            hideLoading();
             return;
         }
 
@@ -41,6 +42,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Adicionar eventos
             setupEventListeners();
+            
+            // Esconder loading após inicialização
+            hideLoading();
         }
 
         function setupEventListeners() {
@@ -1598,14 +1602,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // Funções de carregamento e tratamento de erros
         function showLoading() {
-            document.getElementById('loading-message').style.display = 'flex';
+            const loadingMessage = document.getElementById('loading-message');
+            if (loadingMessage) {
+                loadingMessage.style.display = 'flex';
+            }
+            
             document.querySelectorAll('.card-loading').forEach(el => {
                 el.style.display = 'flex';
             });
         }
 
         function hideLoading() {
-            document.getElementById('loading-message').style.display = 'none';
+            const loadingMessage = document.getElementById('loading-message');
+            if (loadingMessage) {
+                loadingMessage.style.display = 'none';
+            }
+            
             document.querySelectorAll('.card-loading').forEach(el => {
                 el.style.display = 'none';
             });
@@ -1613,27 +1625,31 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         function showError(message) {
             const errorElement = document.getElementById('error-message');
-            errorElement.querySelector('p').innerHTML = `⚠️ ${message}. <a href="#" id="retry-btn">Tentar novamente</a>`;
-            errorElement.style.display = 'flex';
-            
-            document.getElementById('retry-btn').addEventListener('click', async (e) => {
-                e.preventDefault();
-                errorElement.style.display = 'none';
-                showLoading();
-                try {
-                    await loadFromFirebase();
-                } catch (error) {
-                    showError('Erro ao recarregar os dados');
-                } finally {
-                    hideLoading();
+            if (errorElement) {
+                errorElement.querySelector('p').innerHTML = `⚠️ ${message}. <a href="#" id="retry-btn">Tentar novamente</a>`;
+                errorElement.style.display = 'flex';
+                
+                const retryBtn = document.getElementById('retry-btn');
+                if (retryBtn) {
+                    retryBtn.addEventListener('click', async (e) => {
+                        e.preventDefault();
+                        errorElement.style.display = 'none';
+                        showLoading();
+                        try {
+                            await loadFromFirebase();
+                        } catch (error) {
+                            showError('Erro ao recarregar os dados');
+                        } finally {
+                            hideLoading();
+                        }
+                    });
                 }
-            });
+            }
         }
 
     } catch (error) {
         showError('Erro ao carregar dados do dashboard');
         console.error('Erro geral:', error);
-    } finally {
         hideLoading();
     }
 });
