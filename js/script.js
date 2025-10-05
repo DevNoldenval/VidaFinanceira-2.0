@@ -1,13 +1,22 @@
-// Importações do Firebase
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
-import { getFirestore, collection, getDocs, query, where, orderBy, limit, doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
+// js/script.js
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+// Importar configuração do Firebase
+import { firebaseConfig, db, app } from './firebase-config.js';
 
-// Restante do seu código aqui...
-// (use o código completo fornecido anteriormente)
+// Importar funções do Firebase
+import { 
+  collection, getDocs, query, where, orderBy, limit, 
+  doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp 
+} from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
+
+// Verificar se o Firebase foi carregado
+if (typeof db === 'undefined') {
+  console.error('❌ Firebase não foi carregado. Verifique a conexão com a internet.');
+  alert('Erro ao carregar o Firebase. Verifique sua conexão.');
+  throw new Error('Firebase não carregado');
+}
+
+console.log("✅ Firebase SDK carregado com sucesso!");
 
 // Esperar o DOM carregar
 document.addEventListener('DOMContentLoaded', async () => {
@@ -15,14 +24,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     showLoading();
     
     try {
-        // Verificar se o Firebase foi carregado
-        if (typeof db === 'undefined') {
-            console.error('Firebase não foi carregado. Verifique a conexão com a internet.');
-            showNotification('Erro ao carregar o Firebase. Verifique sua conexão.', 'error');
-            hideLoading();
-            return;
-        }
-
         // Inicializar dados
         let currentUser = 'cardUserId';
         let transactions = [];
@@ -476,6 +477,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 value: parseFloat(transactionValue.value),
                 date: transactionDate.value,
                 user: transactionUser.value,
+                createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp()
             };
 
@@ -840,6 +842,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 limit: parseFloat(cardLimit.value),
                 closingDay: parseInt(cardClosingDay.value),
                 dueDate: parseInt(cardDueDate.value),
+                createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp()
             };
 
@@ -1024,6 +1027,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 name: userName.value,
                 email: userEmail && userEmail.value ? userEmail.value : '',
                 avatar: userAvatar.value.toUpperCase(),
+                createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp()
             };
 
@@ -1660,5 +1664,3 @@ document.addEventListener('DOMContentLoaded', async () => {
         hideLoading();
     }
 });
-
-
