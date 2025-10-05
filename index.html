@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinanFácil - Controle Financeiro Pessoal</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <header>
+        <div class="container header-container">
+            <div class="logo">
+                <i class="fas fa-wallet"></i>
+                <span>FinanFácil</span>
+            </div>
+            <div class="user-info">
+                <select class="user-selector" id="userSelector">
+                    <option value="user1">Noldenval</option>
+                    <option value="user2">Eliane</option>
+                </select>
+                <div class="user-avatar" id="userAvatar">V</div>
+            </div>
+        </div>
+    </header>
+    <main class="container">
+        <section class="dashboard">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Receitas</h3>
+                    <div class="card-icon income-icon">
+                        <i class="fas fa-arrow-up"></i>
+                    </div>
+                </div>
+                <div class="card-value" id="incomeValue">R$ 0,00</div>
+                <div class="card-description">Total de receitas do mês</div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Despesas</h3>
+                    <div class="card-icon expense-icon">
+                        <i class="fas fa-arrow-down"></i>
+                    </div>
+                </div>
+                <div class="card-value" id="expenseValue">R$ 0,00</div>
+                <div class="card-description">Total de despesas do mês</div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Saldo</h3>
+                    <div class="card-icon balance-icon">
+                        <i class="fas fa-balance-scale"></i>
+                    </div>
+                </div>
+                <div class="card-value" id="balanceValue">R$ 0,00</div>
+                <div class="card-description">Saldo atual do mês</div>
+            </div>
+        </section>
+
+        <section class="transactions-section">
+            <div class="section-header">
+                <h2 class="section-title">Transações Recentes</h2>
+                <button class="btn" id="addTransactionBtn">
+                    <i class="fas fa-plus"></i>
+                    <span>Nova Transação</span>
+                </button>
+            </div>
+
+            <div class="tabs">
+                <div class="tab active" data-tab="all">Todas</div>
+                <div class="tab" data-tab="income">Receitas</div>
+                <div class="tab" data-tab="expense">Despesas</div>
+            </div>
+
+            <div class="tab-content active" id="all-tab">
+                <div class="loading" id="allLoading">
+                    <div class="spinner"></div>
+                </div>
+                <table class="transactions-table" id="allTable" style="display: none;">
+                    <thead>
+                        <tr>
+                            <th>Descrição</th>
+                            <th>Categoria</th>
+                            <th>Data</th>
+                            <th>Valor</th>
+                            <th>Usuário</th>
+                            <th>Cartão</th>
+                            <th>Parcelas</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactionsTableBody">
+                        <tr>
+                            <td colspan="7" style="text-align: center; padding: 2rem;">Nenhuma transação encontrada</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="tab-content" id="income-tab">
+                <div class="loading" id="incomeLoading">
+                    <div class="spinner"></div>
+                </div>
+                <table class="transactions-table" id="incomeTable" style="display: none;">
+                    <thead>
+                        <tr>
+                            <th>Descrição</th>
+                            <th>Categoria</th>
+                            <th>Data</th>
+                            <th>Valor</th>
+                            <th>Usuário</th>
+                            <th>Cartão</th>
+                            <th>Parcelas</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="incomeTableBody">
+                        <tr>
+                            <td colspan="7" style="text-align: center; padding: 2rem;">Nenhuma receita encontrada</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="tab-content" id="expense-tab">
+                <div class="loading" id="expenseLoading">
+                    <div class="spinner"></div>
+                </div>
+                <table class="transactions-table" id="expenseTable" style="display: none;">
+                    <thead>
+                        <tr>
+                            <th>Descrição</th>
+                            <th>Categoria</th>
+                            <th>Data</th>
+                            <th>Valor</th>
+                            <th>Usuário</th>
+                            <th>Cartão</th>
+                            <th>Parcelas</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="expenseTableBody">
+                        <tr>
+                            <td colspan="7" style="text-align: center; padding: 2rem;">Nenhuma despesa encontrada</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="cards-section">
+            <div class="section-header">
+                <h2 class="section-title">Cartões de Crédito</h2>
+                <button class="btn btn-secondary" id="addCardBtn">
+                    <i class="fas fa-plus"></i>
+                    <span>Adicionar Cartão</span>
+                </button>
+            </div>
+
+            <div class="loading" id="cardsLoading">
+                <div class="spinner"></div>
+            </div>
+            <div class="cards-grid" id="cardsGrid" style="display: none;">
+                <!-- Cartões serão carregados aqui -->
+            </div>
+        </section>
+
+         <section class="invoice-section">
+            <div class="section-header">
+                <h2 class="section-title">Relatório de Fatura</h2>
+                <button class="btn btn-secondary" id="generateInvoiceBtn">
+                    <i class="fas fa-file-invoice"></i>
+                    <span>Gerar Relatório</span>
+                </button>
+            </div>
+        </section>
+
+        <section class="users-section">
+            <div class="section-header">
+                <h2 class="section-title">Usuários</h2>
+                <button class="btn btn-secondary" id="addUserBtn">
+                    <i class="fas fa-plus"></i>
+                    <span>Adicionar Usuário</span>
+                </button>
+            </div>
+
+            <div class="loading" id="usersLoading">
+                <div class="spinner"></div>
+            </div>
+            <div class="users-grid" id="usersGrid" style="display: none;">
+                <!-- Usuários serão carregados aqui -->
+            </div>
+        </section>
+
+       
+        
+    </main>
+
+    <!-- Modal de Transação -->
+    <div class="modal" id="transactionModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Nova Transação</h3>
+                <button class="close-btn" id="closeTransactionModal">&times;</button>
+            </div>
+
+            <form id="transactionForm">
+                <div class="form-group">
+                    <label class="form-label" for="transactionType">Tipo</label>
+                    <select class="form-control" id="transactionType">
+                        <option value="income">Receita</option>
+                        <option value="expense">Despesa</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="transactionDescription">Descrição</label>
+                    <input type="text" class="form-control" id="transactionDescription"
+                        placeholder="Ex: Salário, Supermercado" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="transactionCategory">Categoria</label>
+                    <select class="form-control" id="transactionCategory">
+                        <option value="food">Alimentação</option>
+                        <option value="transport">Transporte</option>
+                        <option value="shopping">Compras</option>
+                        <option value="bills">Contas</option>
+                        <option value="entertainment">Entretenimento</option>
+                        <option value="health">Saúde</option>
+                        <option value="education">Educação</option>
+                        <option value="salary">Salário</option>
+                        <option value="investments">Investimentos</option>
+                        <option value="other">Outros</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="transactionPaymentMethod">Método de Pagamento</label>
+                    <select class="form-control" id="transactionPaymentMethod">
+                        <option value="credit-card">Cartão de Crédito</option>
+                        <option value="debit-card">Cartão de Débito</option>
+                        <option value="pix">PIX</option>
+                        <option value="money">Dinheiro</option>
+                        <option value="bank-transfer">Transferência Bancária</option>
+                        <option value="boleto">Boleto</option>
+                    </select>
+                </div>
+
+                <!-- Campo para selecionar o cartão (aparece quando método de pagamento é cartão de crédito) -->
+                <div class="form-group" id="cardSelectionGroup" style="display: none;">
+                    <label class="form-label" for="transactionCard">Cartão</label>
+                    <select class="form-control" id="transactionCard">
+                        <option value="">Selecione um cartão</option>
+                    </select>
+                </div>
+
+                <!-- Campo para selecionar o usuário que utilizou o cartão -->
+                <div class="form-group" id="cardUserGroup" style="display: none;">
+                    <label class="form-label" for="transactionCardUser">Quem utilizou o cartão</label>
+                    <select class="form-control" id="transactionCardUser">
+                        <option value="">Selecione um usuário</option>
+                    </select>
+                </div>
+
+                <!-- Campo para informar se a compra é a prazo ou à vista (aparece quando método de pagamento é cartão de crédito) -->
+                <div class="form-group" id="installmentTypeGroup" style="display: none;">
+                    <label class="form-label">Tipo de pagamento</label>
+                    <div>
+                        <label class="radio-label">
+                            <input type="radio" name="installmentType" value="cash" checked> À vista
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="installmentType" value="installment"> A prazo
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Campo para informar a quantidade de parcelas (aparece quando tipo de pagamento é a prazo) -->
+                <div class="form-group" id="installmentsGroup" style="display: none;">
+                    <label class="form-label" for="transactionInstallments">Quantidade de parcelas</label>
+                    <input type="number" class="form-control" id="transactionInstallments" min="2" max="36" value="2">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="transactionValue">Valor (R$)</label>
+                    <input type="number" class="form-control" id="transactionValue" placeholder="0,00" step="0.01"
+                        min="0.01" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="transactionDate">Data</label>
+                    <input type="date" class="form-control" id="transactionDate" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="transactionUser">Usuário</label>
+                    <select class="form-control" id="transactionUser">
+                        <option value="user1">Você</option>
+                        <option value="user2">Sua Esposa</option>
+                    </select>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-cancel" id="cancelTransaction">Cancelar</button>
+                    <button type="submit" class="btn btn-success">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Cartão -->
+    <div class="modal" id="cardModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Adicionar Cartão</h3>
+                <button class="close-btn" id="closeCardModal">&times;</button>
+            </div>
+
+            <form id="cardForm">
+                <div class="form-group">
+                    <label class="form-label" for="cardName">Nome do Cartão</label>
+                    <input type="text" class="form-control" id="cardName" placeholder="Ex: Nubank, Itaú" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="cardLimit">Limite Total (R$)</label>
+                    <input type="number" class="form-control" id="cardLimit" placeholder="0,00" step="0.01" min="0.01"
+                        required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="cardClosingDay">Dia de Fechamento</label>
+                    <input type="number" class="form-control" id="cardClosingDay" placeholder="Ex: 10" min="1" max="31"
+                        required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="cardDueDate">Dia do Vencimento</label>
+                    <input type="number" class="form-control" id="cardDueDate" placeholder="Ex: 15" min="1" max="31"
+                        required>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-cancel" id="cancelCard">Cancelar</button>
+                    <button type="submit" class="btn btn-success">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Usuário -->
+    <div class="modal" id="userModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Adicionar Usuário</h3>
+                <button class="close-btn" id="closeUserModal">&times;</button>
+            </div>
+
+            <form id="userForm">
+                <div class="form-group">
+                    <label class="form-label" for="userName">Nome</label>
+                    <input type="text" class="form-control" id="userName" placeholder="Ex: João, Maria" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="userEmail">E-mail</label>
+                    <input type="email" class="form-control" id="userEmail" placeholder="Ex: joao@example.com">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="usuario">Apelido</label>
+                    <input type="text" class="form-control" id="usuario" placeholder="Ex: Chico" maxlength="12">
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-cancel" id="cancelUser">Cancelar</button>
+                    <button type="submit" class="btn btn-success">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Relatório de Fatura -->
+    <div class="modal" id="invoiceReportModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Relatório de Fatura</h3>
+                <button class="close-btn" id="closeInvoiceReportModal">&times;</button>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="reportCard">Cartão</label>
+                <select class="form-control" id="reportCard">
+                    <option value="">Selecione um cartão</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="reportMonth">Mês</label>
+                <select class="form-control" id="reportMonth">
+                    <option value="0">Janeiro</option>
+                    <option value="1">Fevereiro</option>
+                    <option value="2">Março</option>
+                    <option value="3">Abril</option>
+                    <option value="4">Maio</option>
+                    <option value="5">Junho</option>
+                    <option value="6">Julho</option>
+                    <option value="7">Agosto</option>
+                    <option value="8">Setembro</option>
+                    <option value="9">Outubro</option>
+                    <option value="10">Novembro</option>
+                    <option value="11">Dezembro</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="reportYear">Ano</label>
+                <select class="form-control" id="reportYear">
+                    <!-- Anos serão preenchidos dinamicamente -->
+                </select>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="btn btn-cancel" id="cancelInvoiceReport">Cancelar</button>
+                <button type="button" class="btn btn-success" id="generateInvoiceReport">Gerar Relatório</button>
+            </div>
+
+            <div id="invoiceReportContent" style="margin-top: 20px; display: none;">
+                <!-- Conteúdo do relatório será gerado aqui -->
+            </div>
+        </div>
+    </div>
+
+    <div class="notification" id="notification">
+        <i class="fas fa-check-circle"></i>
+        <span id="notificationMessage">Operação realizada com sucesso!</span>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+
+    <!-- Nosso script -->
+    <script src="script.js"> </script>
+    <script type="module" src="firebase-config.js"></script>
+    <script type="module" src="dashboard.js"></script>
+
+</body>
+
+</html>
