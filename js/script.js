@@ -1,4 +1,4 @@
-// Esperar o Firebase carregar
+   // Esperar o Firebase carregar
 window.addEventListener('load', function () {
     // Verificar se o Firebase foi carregado
     if (typeof firebase === 'undefined') {
@@ -7,22 +7,17 @@ window.addEventListener('load', function () {
         return;
     }
 
-    // Configuração do Firebase
-    const firebaseConfig = {
-        apiKey: "AIzaSyCYQm0K_4EdKHvvXOs81raKmstmAsRdT6g",
-        authDomain: "controlemeubolso.firebaseapp.com",
-        databaseURL: "https://controlemeubolso-default-rtdb.firebaseio.com",
-        projectId: "controlemeubolso",
-        storageBucket: "controlemeubolso.firebasestorage.app",
-        messagingSenderId: "369393280169",
-        appId: "1:369393280169:web:0b0d768f074e0ff4c775b8",
-        measurementId: "G-0EYHJF137F"
-    };
+    // Verificar se a configuração do Firebase está disponível
+    if (typeof firebaseConfig === 'undefined') {
+        console.error('Configuração do Firebase não encontrada. Verifique se o firebase-config.js foi carregado.');
+        showNotification('Erro ao carregar configuração do Firebase.', 'error');
+        return;
+    }
 
     // Inicializar Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
-
+    
     // Dados iniciais (vazio, será preenchido pelo Firebase)
     let currentUser = 'cardUserId';
     let transactions = [];
