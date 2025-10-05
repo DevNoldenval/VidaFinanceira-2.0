@@ -1,7 +1,4 @@
-// firebase-config.js
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
-import { getFirestore } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
-
+// js/firebase-config.js
 const firebaseConfig = {
   apiKey: "AIzaSyCYQm0K_4EdKHvvXOs81raKmstmAsRdT6g",
   authDomain: "controlemeubolso.firebaseapp.com",
@@ -13,8 +10,10 @@ const firebaseConfig = {
   measurementId: "G-0EYHJF137F"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+// Inicializar Firebase
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
 
-export { db };
+// Disponibilizar globalmente
+window.db = db;
+window.firebaseConfig = firebaseConfig;
